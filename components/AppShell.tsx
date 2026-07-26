@@ -1,12 +1,12 @@
 "use client";
 
 import {
-  Bell, CalendarDays, Camera, Check, ChevronLeft, ChevronRight, Clipboard,
+  Bell, CalendarDays, Camera, Check, ChevronLeft, ChevronRight, Clipboard, Upload, Maximize2, Minimize2,
   Home, Images, Link2, LogOut, Menu, Plus, RefreshCw, Send, Settings,
   Share2, UserCircle, UserPlus, Users, X
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import type { Brand, EventItem, EventMedia, Group, Profile } from "@/types/database";
@@ -120,7 +120,7 @@ export function AppShell({ session }: { session: Session }) {
   if (!groups.length) return <main className={`onboarding ${profile?.brand || "bros"}`}>
     <section className="onboardingCard">
       <span className="onboardingLogo">CC</span>
-      <small>CIRCLE CALENDAR v0.4</small>
+      <small>CIRCLE CALENDAR v0.4.2</small>
       <h1>Bun venit, {profile?.display_name || "prietene"}</h1>
       <p>Creează un cerc nou sau intră în grupul prietenilor cu un cod de invitație.</p>
       <div className="onboardingActions">
@@ -136,9 +136,9 @@ export function AppShell({ session }: { session: Session }) {
 
   const pageTitle = view === "home" ? "Acasă" : view === "media" ? "Amintiri" : view === "groups" ? "Grupuri" : view === "settings" ? "Setări" : "Calendar";
 
-  return <main className={`app ${profile?.brand || "bros"}`}>
+  return <main className={`app ${profile?.brand || "bros"} theme-${profile?.theme || "neon"}`}>
     <aside className={menuOpen ? "sidebar open" : "sidebar"}>
-      <div className="sideLogo"><span>CC</span><div><strong>Circle Calendar</strong><small>PLAN. SHARE. REMEMBER.</small></div><button className="mobileClose" onClick={() => setMenuOpen(false)}><X/></button></div>
+      <div className="sideLogo"><span>CC</span><div><strong>Circle Calendar <em className="versionBadge">v0.4.2</em></strong><small>PLAN. SHARE. REMEMBER.</small></div><button className="mobileClose" onClick={() => setMenuOpen(false)}><X/></button></div>
       <label className="groupPicker">GRUP ACTIV<select value={activeGroupId} onChange={event => setActiveGroupId(event.target.value)}>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
       <nav>
         <button className={view === "home" ? "active" : ""} onClick={() => openView("home")}><Home/>Acasă</button>
@@ -165,7 +165,7 @@ export function AppShell({ session }: { session: Session }) {
       {view === "settings" && profile && <SettingsPage profile={profile} email={session.user.email || ""} onSaved={async () => { await loadProfile(); notify("Setările au fost salvate."); }}/>} 
     </section>
 
-    <nav className="mobileNav"><button className={view==="home"?"active":""} onClick={()=>setView("home")}><Home/><span>Acasă</span></button><button className={view==="calendar"?"active":""} onClick={()=>setView("calendar")}><CalendarDays/><span>Calendar</span></button><button className="mobilePlus" onClick={()=>{setSelectedEvent(null);setModalOpen(true);}}><Plus/></button><button className={view==="media"?"active":""} onClick={()=>setView("media")}><Images/><span>Amintiri</span></button><button className={view==="groups"?"active":""} onClick={()=>setView("groups")}><Users/><span>Grupuri</span></button></nav>
+    <nav className="mobileNav"><button className={view==="home"?"active":""} onClick={()=>setView("home")}><Home/><span>Acasă</span></button><button className={view==="calendar"?"active":""} onClick={()=>setView("calendar")}><CalendarDays/><span>Calendar</span></button><button className="mobilePlus" onClick={()=>{setSelectedEvent(null);setModalOpen(true);}}><Plus/></button><button className={view==="media"?"active":""} onClick={()=>setView("media")}><Images/><span>Amintiri</span></button><button className={view==="settings"?"active":""} onClick={()=>setView("settings")}><Settings/><span>Setări</span></button></nav>
 
     {modalOpen && <EventModal event={selectedEvent} groupId={activeGroupId} userId={session.user.id} onClose={() => setModalOpen(false)} onSaved={async () => {await loadEvents();await loadMedia();}} onDeleted={async () => {await loadEvents();await loadMedia();}}/>}
     {dialog === "create" && <CreateGroupDialog onClose={() => setDialog(null)} onCreate={createGroup}/>} 
@@ -207,16 +207,91 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
   const [displayName, setDisplayName] = useState(profile.display_name || "");
   const [username, setUsername] = useState(profile.username || "");
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || "");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState(profile.avatar_url || "");
   const [brand, setBrand] = useState<Brand>(profile.brand || "bros");
   const [theme, setTheme] = useState(profile.theme || "neon");
-  const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  return <div className="page settingsPage"><section className="pageTitle"><small>CONTUL TĂU</small><h1>Profil și setări</h1><p>Aici îți schimbi numele, avatarul și stilul Circle Calendar.</p></section><form className="settingsGrid" onSubmit={async event => { event.preventDefault(); setBusy(true); setError(""); const { error: updateError } = await supabase.from("profiles").update({ display_name: displayName.trim(), username: username.trim() || null, avatar_url: avatarUrl.trim() || null, brand, theme }).eq("id", profile.id); if (updateError) setError(updateError.message); else await onSaved(); setBusy(false); }}><section className="settingsCard"><header><UserCircle/><div><small>PROFIL</small><h3>Date personale</h3></div></header><div className="profilePreview">{avatarUrl ? <img src={avatarUrl} alt="Avatar"/> : <span>{(displayName || username || "CC").slice(0,2).toUpperCase()}</span>}<div><strong>{displayName || "Numele tău"}</strong><small>{email}</small></div></div><label>Nume afișat<input value={displayName} onChange={event => setDisplayName(event.target.value)} required/></label><label>Username<input value={username} onChange={event => setUsername(event.target.value)} placeholder="ionut"/></label><label>Link avatar<input type="url" value={avatarUrl} onChange={event => setAvatarUrl(event.target.value)} placeholder="https://…"/></label></section><section className="settingsCard"><header><Settings/><div><small>ASPECT</small><h3>Experiența ta</h3></div></header><label>Varianta aplicației<div className="brandChoice"><button type="button" className={brand === "bros" ? "active" : ""} onClick={() => setBrand("bros")}><span>⚡</span><strong>Bro&apos;s Calendar</strong><small>Cyan & albastru</small></button><button type="button" className={brand === "girls" ? "active" : ""} onClick={() => setBrand("girls")}><span>✨</span><strong>Girls&apos; Calendar</strong><small>Roz & violet</small></button></div></label><label>Temă<select value={theme} onChange={event => setTheme(event.target.value)}><option value="neon">Neon</option><option value="midnight">Midnight</option><option value="soft">Soft</option></select></label><div className="accountInfo"><span>Email</span><strong>{email}</strong><small>Emailul se administrează din contul Supabase.</small></div></section><div className="settingsFooter">{error && <p className="errorMessage">{error}</p>}<button className="primary" disabled={busy}><Check/> {busy ? "Se salvează…" : "Salvează setările"}</button></div></form></div>;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => () => {
+    if (avatarPreview.startsWith("blob:")) URL.revokeObjectURL(avatarPreview);
+  }, [avatarPreview]);
+
+  useEffect(() => {
+    const app = document.querySelector(".app");
+    if (!app) return;
+    app.classList.remove("bros", "girls", "theme-neon", "theme-midnight", "theme-soft");
+    app.classList.add(brand, `theme-${theme}`);
+  }, [brand, theme]);
+
+  async function saveSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      let finalAvatarUrl = avatarUrl;
+      if (avatarFile) {
+        if (!avatarFile.type.startsWith("image/")) throw new Error("Alege un fișier imagine.");
+        if (avatarFile.size > 5 * 1024 * 1024) throw new Error("Imaginea trebuie să fie mai mică de 5 MB.");
+        const extension = avatarFile.name.split(".").pop()?.toLowerCase() || "jpg";
+        const path = `${profile.id}/avatar-${Date.now()}.${extension}`;
+        const { error: uploadError } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, contentType: avatarFile.type });
+        if (uploadError) throw uploadError;
+        finalAvatarUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+      }
+      const { error: updateError } = await supabase.from("profiles").update({
+        display_name: displayName.trim(),
+        username: username.trim() || null,
+        avatar_url: finalAvatarUrl || null,
+        brand,
+        theme
+      }).eq("id", profile.id);
+      if (updateError) throw updateError;
+      setAvatarUrl(finalAvatarUrl);
+      setAvatarFile(null);
+      await onSaved();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Setările nu au putut fi salvate.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="page settingsPage">
+    <section className="settingsHero"><div><small>CONTUL TĂU</small><h1>Profil și aspect</h1><p>Schimbările de aspect se văd imediat după salvare.</p></div></section>
+    <form className="settingsLayout" onSubmit={saveSettings}>
+      <section className="profileEditorCard">
+        <div className="avatarEditor">
+          <div className="avatarLarge">{avatarPreview ? <img src={avatarPreview} alt="Avatar"/> : <span>{(displayName || username || "CC").slice(0,2).toUpperCase()}</span>}</div>
+          <div><h2>{displayName || "Numele tău"}</h2><p>{email}</p><label className="avatarUpload"><Upload/> Încarcă fotografie<input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => { const file=event.target.files?.[0] || null; setAvatarFile(file); if (file) setAvatarPreview(URL.createObjectURL(file)); }}/></label><small>JPG, PNG sau WEBP, maximum 5 MB.</small></div>
+        </div>
+        <div className="settingsFields"><label>Nume afișat<input value={displayName} onChange={event => setDisplayName(event.target.value)} required/></label><label>Username<input value={username} onChange={event => setUsername(event.target.value)} placeholder="ionut"/></label></div>
+      </section>
+
+      <section className="appearanceCard">
+        <div className="sectionHeading"><Settings/><div><small>ASPECT</small><h3>Alege stilul aplicației</h3></div></div>
+        <div className="brandChoice"><button type="button" className={brand === "bros" ? "active" : ""} onClick={() => setBrand("bros")}><span>⚡</span><strong>Bro&apos;s</strong><small>Albastru energic</small></button><button type="button" className={brand === "girls" ? "active" : ""} onClick={() => setBrand("girls")}><span>✨</span><strong>Girls&apos;</strong><small>Roz și violet</small></button></div>
+        <div className="themeCards">
+          {[{id:"neon",name:"Neon",desc:"Contrast puternic"},{id:"midnight",name:"Midnight",desc:"Întunecat și discret"},{id:"soft",name:"Soft",desc:"Mai luminos și calm"}].map(option => <button key={option.id} type="button" className={theme===option.id?"active":""} onClick={()=>setTheme(option.id)}><span className={`themeSwatch ${option.id}`}/><strong>{option.name}</strong><small>{option.desc}</small>{theme===option.id&&<Check/>}</button>)}
+        </div>
+      </section>
+
+      <div className="settingsSaveBar">{error && <p className="errorMessage">{error}</p>}<button className="primary" disabled={busy}><Check/> {busy ? "Se salvează…" : "Salvează modificările"}</button></div>
+    </form>
+  </div>;
 }
 
 function CalendarPage({month,setMonth,events,onEvent}:{month:Date;setMonth:(date:Date)=>void;events:EventItem[];onEvent:(event:EventItem)=>void}) {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const saved = window.localStorage.getItem("circle-calendar-compact");
+    setCompact(saved ? saved === "true" : window.innerWidth < 700);
+  }, []);
+  const toggleCompact = () => setCompact(value => { const next=!value; window.localStorage.setItem("circle-calendar-compact",String(next)); return next; });
   const year=month.getFullYear(), currentMonth=month.getMonth();
   const firstDay=(new Date(year,currentMonth,1).getDay()+6)%7;
   const days=new Date(year,currentMonth+1,0).getDate();
   const cells=Array.from({length:42},(_,index)=>{const day=index-firstDay+1;return day>=1&&day<=days?day:null});
-  return <div className="page"><section className="calendarPanel"><header className="calendarHeader"><div><small>CALENDAR</small><h1>{monthTitle(month)}</h1></div><div><button className="iconButton" onClick={()=>setMonth(new Date(year,currentMonth-1,1))}><ChevronLeft/></button><button onClick={()=>setMonth(new Date())}>Astăzi</button><button className="iconButton" onClick={()=>setMonth(new Date(year,currentMonth+1,1))}><ChevronRight/></button></div></header><div className="weekDays">{["L","Ma","Mi","J","V","S","D"].map(day=><span key={day}>{day}</span>)}</div><div className="calendarGrid">{cells.map((day,index)=>{const date=day?`${year}-${String(currentMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`:"";const dayEvents=events.filter(event=>event.event_date===date);return <div key={index} className={!day?"day muted":"day"}><b>{day}</b>{dayEvents.map(event=><button key={event.id} onClick={()=>onEvent(event)}><strong>{event.title}</strong><small>{event.event_time?.slice(0,5)}</small></button>)}</div>})}</div></section></div>;
+  return <div className="page"><section className={`calendarPanel ${compact?"compactCalendar":"largeCalendar"}`}><header className="calendarHeader"><div><small>CALENDAR</small><h1>{monthTitle(month)}</h1></div><div><button className="calendarSizeButton" onClick={toggleCompact} title={compact?"Mărește calendarul":"Micșorează calendarul"}>{compact?<Maximize2/>:<Minimize2/>}<span>{compact?"Mare":"Compact"}</span></button><button className="iconButton" onClick={()=>setMonth(new Date(year,currentMonth-1,1))}><ChevronLeft/></button><button onClick={()=>setMonth(new Date())}>Astăzi</button><button className="iconButton" onClick={()=>setMonth(new Date(year,currentMonth+1,1))}><ChevronRight/></button></div></header><div className="calendarViewport"><div className="weekDays">{["L","Ma","Mi","J","V","S","D"].map(day=><span key={day}>{day}</span>)}</div><div className="calendarGrid">{cells.map((day,index)=>{const date=day?`${year}-${String(currentMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`:"";const dayEvents=events.filter(event=>event.event_date===date);return <div key={index} className={!day?"day muted":"day"}><b>{day}</b>{dayEvents.map(event=><button key={event.id} onClick={()=>onEvent(event)} title={event.title}><strong>{event.title}</strong><small>{event.event_time?.slice(0,5)}</small></button>)}</div>})}</div></div></section></div>;
 }
