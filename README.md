@@ -1,29 +1,23 @@
-# Circle Calendar v0.4
+# Circle Calendar v0.5.0
 
-Versiune conectată la Supabase, cu navigare restaurată și flux complet de grupuri.
+## Ce este nou
+- click/tap direct pe o zi pentru a crea un eveniment cu data completată;
+- glow discret pentru ziua curentă;
+- calendar compact/mare, cu modul compact implicit pe telefon;
+- palete distincte Bro's (Ocean, Forest, Graphite) și Girls' (Rose, Lavender, Peach);
+- locație de eveniment cu Google Places, hartă, pin mutabil și link Google Maps;
+- încărcare locală a avatarului păstrată din v0.4.2.
 
-## Include
-- autentificare reală Supabase;
-- profil și setări de cont (nume, username, avatar, Bro/Girls, temă);
-- creare grup;
-- intrare într-un grup cu un cod sau link de invitație;
-- distribuire invitație, copiere cod și copiere link;
-- evenimente și media în Supabase;
-- UI responsive și navigare mobilă.
+## Actualizare Supabase
+Rulează în SQL Editor doar conținutul:
+`supabase/migrations/005_event_map_location.sql`
 
-## Actualizare de la v0.3
-Rulează în Supabase SQL Editor:
+## Google Maps
+În Google Cloud activează pentru cheia web:
+- Maps JavaScript API
+- Places API
 
-`supabase/migrations/003_group_invites.sql`
+Adaugă în Vercel Environment Variables:
+`NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
 
-Aceasta instalează funcția securizată `join_group_by_invite_code`.
-
-## Configurare locală
-1. Copiază `.env.local.example` în `.env.local`.
-2. Completează cheia publishable Supabase.
-3. Rulează `npm install` și `npm run dev`.
-
-## Vercel
-Setează variabilele:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+Restricționează cheia la domeniul Vercel/website. Fără această cheie, evenimentul salvează în continuare locația ca text, dar harta și autocomplete-ul nu apar.

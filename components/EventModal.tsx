@@ -3,10 +3,12 @@
 import { Camera, Check, Film, LoaderCircle, Trash2, Upload, X } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { LocationPicker } from "./LocationPicker";
 import type { EventItem, EventMedia } from "@/types/database";
 
-export function EventModal({ event, groupId, userId, onClose, onSaved, onDeleted }: {
+export function EventModal({ event, initialDate, groupId, userId, onClose, onSaved, onDeleted }: {
   event: EventItem | null;
+  initialDate: string;
   groupId: string;
   userId: string;
   onClose: () => void;
@@ -17,6 +19,7 @@ export function EventModal({ event, groupId, userId, onClose, onSaved, onDeleted
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState("");
   const [media, setMedia] = useState<EventMedia[]>([]);
+  const [locationValue, setLocationValue] = useState({ location: event?.location || "", lat: event?.location_lat ?? null, lng: event?.location_lng ?? null, placeId: event?.place_id ?? null });
   const isEdit = Boolean(event);
 
   useEffect(() => { if (event) void loadMedia(event.id); }, [event?.id]);
@@ -41,7 +44,11 @@ export function EventModal({ event, groupId, userId, onClose, onSaved, onDeleted
       title: String(form.get("title") || "").trim(),
       event_date: String(form.get("event_date") || ""),
       event_time: String(form.get("event_time") || "") || null,
-      location: String(form.get("location") || "").trim(),
+      location: locationValue.location.trim(),
+      location_lat: locationValue.lat,
+      location_lng: locationValue.lng,
+      place_id: locationValue.placeId,
+      maps_url: locationValue.lat != null && locationValue.lng != null ? `https://www.google.com/maps/search/?api=1&query=${locationValue.lat},${locationValue.lng}` : (locationValue.location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationValue.location)}` : null),
       details: String(form.get("details") || "").trim() || null,
       theme: "cyan",
     };
@@ -107,8 +114,8 @@ export function EventModal({ event, groupId, userId, onClose, onSaved, onDeleted
     <header className="modalHeader"><div><small>{isEdit ? "EVENT SPACE" : "NEW EVENT"}</small><h2>{isEdit ? event?.title : "Creează eveniment"}</h2></div><button className="iconButton" onClick={onClose}><X/></button></header>
     <form className="eventForm" onSubmit={save}>
       <label>Titlu<input name="title" defaultValue={event?.title || ""} required/></label>
-      <div className="formGrid"><label>Data<input name="event_date" type="date" defaultValue={event?.event_date || ""} required/></label><label>Ora<input name="event_time" type="time" defaultValue={event?.event_time || ""}/></label></div>
-      <label>Locație<input name="location" defaultValue={event?.location || ""} placeholder="Movilița, Constanța"/></label>
+      <div className="formGrid"><label>Data<input name="event_date" type="date" defaultValue={event?.event_date || initialDate || ""} required/></label><label>Ora<input name="event_time" type="time" defaultValue={event?.event_time || ""}/></label></div>
+      <LocationPicker value={locationValue} onChange={setLocationValue}/>
       <label>Detalii<textarea name="details" defaultValue={event?.details || ""} rows={3}/></label>
       <div className="formActions">{event && <button type="button" className="dangerButton" onClick={removeEvent}><Trash2/> Șterge</button>}<button className="primary" disabled={busy}><Check/> {busy ? "Se salvează…" : "Salvează"}</button></div>
     </form>

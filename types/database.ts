@@ -27,6 +27,9 @@ export type EventItem = {
   event_time: string | null;
   location: string;
   maps_url: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  place_id: string | null;
   details: string | null;
   cover_path: string | null;
   theme: string;
