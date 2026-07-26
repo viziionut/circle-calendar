@@ -121,7 +121,7 @@ export function AppShell({ session }: { session: Session }) {
   if (!groups.length) return <main className={`onboarding ${profile?.brand || "bros"}`}>
     <section className="onboardingCard">
       <span className="onboardingLogo">CC</span>
-      <small>CIRCLE CALENDAR v0.5.0</small>
+      <small>CIRCLE CALENDAR v0.5.1</small>
       <h1>Bun venit, {profile?.display_name || "prietene"}</h1>
       <p>Creează un cerc nou sau intră în grupul prietenilor cu un cod de invitație.</p>
       <div className="onboardingActions">
@@ -139,7 +139,7 @@ export function AppShell({ session }: { session: Session }) {
 
   return <main className={`app ${profile?.brand || "bros"} theme-${profile?.theme || "neon"}`}>
     <aside className={menuOpen ? "sidebar open" : "sidebar"}>
-      <div className="sideLogo"><span>CC</span><div><strong>Circle Calendar <em className="versionBadge">v0.5.0</em></strong><small>PLAN. SHARE. REMEMBER.</small></div><button className="mobileClose" onClick={() => setMenuOpen(false)}><X/></button></div>
+      <div className="sideLogo"><span>CC</span><div><strong>Circle Calendar <em className="versionBadge">v0.5.1</em></strong><small>PLAN. SHARE. REMEMBER.</small></div><button className="mobileClose" onClick={() => setMenuOpen(false)}><X/></button></div>
       <label className="groupPicker">GRUP ACTIV<select value={activeGroupId} onChange={event => setActiveGroupId(event.target.value)}>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
       <nav>
         <button className={view === "home" ? "active" : ""} onClick={() => openView("home")}><Home/>Acasă</button>
@@ -222,7 +222,8 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
   useEffect(() => {
     const app = document.querySelector(".app");
     if (!app) return;
-    app.classList.remove("bros", "girls", "theme-neon", "theme-midnight", "theme-soft");
+    const themeClasses = Array.from(app.classList).filter(className => className.startsWith("theme-"));
+    app.classList.remove("bros", "girls", ...themeClasses);
     app.classList.add(brand, `theme-${theme}`);
   }, [brand, theme]);
 
@@ -272,17 +273,18 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
 
       <section className="appearanceCard">
         <div className="sectionHeading"><Settings/><div><small>ASPECT</small><h3>Alege stilul aplicației</h3></div></div>
-        <div className="brandChoice"><button type="button" className={brand === "bros" ? "active" : ""} onClick={() => { setBrand("bros"); if (["rose","lavender","peach"].includes(theme)) setTheme("ocean"); }}><span>⚡</span><strong>Bro&apos;s</strong><small>Albastru energic</small></button><button type="button" className={brand === "girls" ? "active" : ""} onClick={() => { setBrand("girls"); if (["ocean","forest","graphite","neon","midnight","soft"].includes(theme)) setTheme("rose"); }}><span>✨</span><strong>Girls&apos;</strong><small>Roz și violet</small></button></div>
-        <div className="themeCards">
-          {(brand === "bros" ? [
-            {id:"ocean",name:"Ocean",desc:"Albastru și cyan"},
-            {id:"forest",name:"Forest",desc:"Verde și petrol"},
-            {id:"graphite",name:"Graphite",desc:"Gri închis și albastru"}
-          ] : [
-            {id:"rose",name:"Rose",desc:"Roz și zmeură"},
-            {id:"lavender",name:"Lavender",desc:"Lila și violet"},
-            {id:"peach",name:"Peach",desc:"Coral și roz pastel"}
-          ]).map(option => <button key={option.id} type="button" className={theme===option.id?"active":""} onClick={()=>setTheme(option.id)}><span className={`themeSwatch ${option.id}`}/><strong>{option.name}</strong><small>{option.desc}</small>{theme===option.id&&<Check/>}</button>)}
+        <div className="brandChoice"><button type="button" className={brand === "bros" ? "active" : ""} onClick={() => { setBrand("bros"); if (!["ocean","forest","emerald","lime","amber","copper","violet","graphite"].includes(theme)) setTheme("ocean"); }}><span>⚡</span><strong>Bro&apos;s</strong><small>Rece, sport și energic</small></button><button type="button" className={brand === "girls" ? "active" : ""} onClick={() => { setBrand("girls"); if (!["rose","pink","lavender","violet","coral","peach","berry","pearl"].includes(theme)) setTheme("rose"); }}><span>✨</span><strong>Girls&apos;</strong><small>Elegant, cald și pastel</small></button></div>
+        <div className="accentPicker">
+          <div className="accentPickerHeading"><div><small>CULOARE ACCENT</small><strong>{theme.charAt(0).toUpperCase() + theme.slice(1)}</strong></div><span>Se aplică instant în toată aplicația</span></div>
+          <div className="accentRow" role="radiogroup" aria-label="Culoarea temei">
+            {(brand === "bros" ? [
+              {id:"ocean",name:"Ocean"}, {id:"forest",name:"Forest"}, {id:"emerald",name:"Emerald"}, {id:"lime",name:"Lime"},
+              {id:"amber",name:"Amber"}, {id:"copper",name:"Copper"}, {id:"violet",name:"Violet"}, {id:"graphite",name:"Graphite"}
+            ] : [
+              {id:"rose",name:"Rose"}, {id:"pink",name:"Pink"}, {id:"lavender",name:"Lavender"}, {id:"violet",name:"Violet"},
+              {id:"coral",name:"Coral"}, {id:"peach",name:"Peach"}, {id:"berry",name:"Berry"}, {id:"pearl",name:"Pearl"}
+            ]).map(option => <button key={option.id} type="button" role="radio" aria-checked={theme===option.id} aria-label={option.name} title={option.name} className={`accentDot ${option.id}${theme===option.id?" active":""}`} onClick={()=>setTheme(option.id)}><span/>{theme===option.id&&<Check/>}</button>)}
+          </div>
         </div>
       </section>
 
