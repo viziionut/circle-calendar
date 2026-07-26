@@ -78,6 +78,7 @@ export default function Page(){
   const [notificationsRead,setNotificationsRead]=useState(false);
   const [activeGroupId,setActiveGroupId]=useState("g1");
   const [toast,setToast]=useState("");
+  const [quickOpen,setQuickOpen]=useState(false);
 
   useEffect(()=>{
     try{
@@ -177,7 +178,7 @@ export default function Page(){
         </div>
       </header>
 
-      {view==="dashboard"&&<Dashboard events={groupEvents} users={data.users} holidays={data.holidays} setView={setView} setEventOpen={setEventOpen} setEditingEvent={setEditingEvent}/>}
+      {view==="dashboard"&&<Dashboard events={groupEvents} users={data.users} holidays={data.holidays} currentUser={currentUser} activityItems={activityItems} setView={setView} setEventOpen={setEventOpen} setEditingEvent={setEditingEvent}/>}
       {view==="calendar"&&<CalendarView events={groupEvents} users={data.users} currentUser={currentUser} setData={setData} data={data} setToast={setToast} setEventOpen={setEventOpen} setEditingEvent={setEditingEvent}/>}
       {view==="groups"&&<GroupsView groups={data.groups} currentUser={currentUser} setData={setData} data={data} setActiveGroupId={setActiveGroupId} setToast={setToast}/>}
       {view==="holidays"&&<HolidaysView holidays={data.holidays} users={data.users} currentUser={currentUser} data={data} setData={setData} setToast={setToast}/>}
@@ -186,6 +187,22 @@ export default function Page(){
       {view==="feedback"&&<FeedbackView currentUser={currentUser} data={data} setData={setData} setToast={setToast}/>}
       {view==="settings"&&<SettingsView user={currentUser} updateUser={updateUser} setToast={setToast}/>}
     </section>
+    <nav className="mobileNav" aria-label="Mobile navigation">
+      <button className={view==="dashboard"?"active":""} onClick={()=>setView("dashboard")}><Sparkles/><span>Home</span></button>
+      <button className={view==="calendar"?"active":""} onClick={()=>setView("calendar")}><CalendarDays/><span>Calendar</span></button>
+      <button className="mobileAdd" onClick={()=>setQuickOpen(true)} aria-label="Create"><Plus/></button>
+      <button className={view==="messages"?"active":""} onClick={()=>setView("messages")}><MessageCircle/><span>Chat</span></button>
+      <button className={view==="settings"?"active":""} onClick={()=>setView("settings")}><UserRound/><span>Profile</span></button>
+    </nav>
+    {quickOpen&&<div className="quickBack" onClick={()=>setQuickOpen(false)}><section className="quickSheet" onClick={e=>e.stopPropagation()}>
+      <div className="quickHandle"/><div className="quickHead"><div><small>CREATE QUICKLY</small><h3>What do you want to add?</h3></div><button className="iconBtn" onClick={()=>setQuickOpen(false)}><X/></button></div>
+      <div className="quickGrid">
+        <button onClick={()=>{setEditingEvent(null);setEventOpen(true);setQuickOpen(false)}}><CalendarCheck/><strong>Event</strong><small>Plan a date and place</small></button>
+        <button onClick={()=>{setView("groups");setQuickOpen(false)}}><Users/><strong>Group</strong><small>Create or join a circle</small></button>
+        <button onClick={()=>{setView("media");setQuickOpen(false)}}><Camera/><strong>Album</strong><small>Add photos and videos</small></button>
+        <button onClick={()=>{setToast("Polls arrive in the next version");setQuickOpen(false)}}><ThumbsUp/><strong>Poll</strong><small>Vote together soon</small></button>
+      </div>
+    </section></div>}
     {eventOpen&&<EventModal close={()=>{setEventOpen(false);setEditingEvent(null)}} groupId={activeGroup.id} currentUser={currentUser} data={data} setData={setData} setToast={setToast} eventToEdit={editingEvent}/>}
   </main>
 }
@@ -259,22 +276,45 @@ function AuthScreen({data,setData,authMode,setAuthMode,setCurrentUserId,setToast
   </main>
 }
 
-function Dashboard({events,users,holidays,setView,setEventOpen,setEditingEvent}:any){
-  return <div className="page">
-    <section className="welcomePanel"><div><div className="eyebrow"><Sparkles size={15}/> BETA READY</div><h1>Make the next memory happen.</h1><p>Create plans, confirm attendance and collect feedback.</p></div><button className="primary" onClick={()=>{setEditingEvent(null);setEventOpen(true)}}><Plus/> Plan something</button></section>
-    <div className="statsGrid">
-      <Stat icon={<CalendarDays/>} label="Upcoming events" value={String(events.length)} note="In the active group"/>
-      <Stat icon={<Users/>} label="Known testers" value={String(users.length)} note="Stored in this browser"/>
-      <Stat icon={<Plane/>} label="Holiday plans" value={String(holidays.length)} note="Compare availability"/>
-      <Stat icon={<MessageSquareText/>} label="Feedback" value="Open" note="Ask every tester"/>
+function Dashboard({events,users,holidays,currentUser,activityItems,setView,setEventOpen,setEditingEvent}:any){
+  const now=new Date();
+  const upcoming=[...events].filter((e:EventItem)=>new Date(`${e.date}T${e.time||"00:00"}`)>=new Date(now.getFullYear(),now.getMonth(),now.getDate())).sort((a:EventItem,b:EventItem)=>(a.date+a.time).localeCompare(b.date+b.time));
+  const next=upcoming[0];
+  const todayKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+  const todayCount=events.filter((e:EventItem)=>e.date===todayKey).length;
+  return <div className="page dashboardPage">
+    <section className="homeHero">
+      <div><div className="eyebrow"><Sparkles size={15}/> YOUR CIRCLE TODAY</div><h1>Bună, {currentUser.displayName.split(" ")[0]}! <span>👋</span></h1><p>{todayCount?`Ai ${todayCount} ${todayCount===1?"eveniment":"evenimente"} astăzi.`:"Astăzi este liber. Poate facem un plan?"}</p></div>
+      <button className="primary" onClick={()=>{setEditingEvent(null);setEventOpen(true)}}><Plus/> Creează un plan</button>
+    </section>
+
+    <div className="homeGrid">
+      <section className="panel nextEventCard">
+        <div className="panelHead"><div><small>URMĂTORUL EVENIMENT</small><h3>{next?next.title:"Nimic planificat încă"}</h3></div><button onClick={()=>setView("calendar")}>Calendar</button></div>
+        {next?<><div className="nextEventDate"><div><b>{new Date(next.date+"T12:00").getDate()}</b><small>{new Date(next.date+"T12:00").toLocaleString(undefined,{month:"short"}).toUpperCase()}</small></div><span><Clock/> {next.time}</span><span><MapPin/> {next.location}</span></div><p>{next.details||"Deschide calendarul pentru detalii și confirmarea participării."}</p><div className="nextEventFoot"><AvatarStack ids={Object.keys(next.attendees).filter(id=>next.attendees[id]==="yes")} users={users}/><button className="secondary" onClick={()=>setView("calendar")}>Vezi detalii <ChevronRight/></button></div></>:<div className="emptyCompact"><CalendarDays/><p>Creează primul eveniment pentru grup.</p><button className="secondary" onClick={()=>{setEditingEvent(null);setEventOpen(true)}}><Plus/> Eveniment</button></div>}
+      </section>
+
+      <section className="panel activityCard">
+        <div className="panelHead"><div><small>ACTIVITATE RECENTĂ</small><h3>Ce s-a întâmplat</h3></div><button onClick={()=>setView("messages")}>Vezi tot</button></div>
+        <div className="homeActivity">{activityItems.slice(0,4).map((item:any)=><button key={item.id} onClick={()=>setView(item.view)}><span>{item.icon==="calendar"?<CalendarDays/>:item.icon==="message"?<MessageCircle/>:<Plane/>}</span><div><strong>{item.title}</strong><small>{item.text}</small></div><ChevronRight/></button>)}</div>
+      </section>
     </div>
-    <div className="twoCol">
-      <section className="panel"><div className="panelHead"><div><small>NEXT UP</small><h3>Upcoming events</h3></div><button onClick={()=>setView("calendar")}>View calendar</button></div>
-        {events.length?events.slice(0,4).map((e:EventItem)=><div className="eventRow" key={e.id}><div className="dateTile"><b>{new Date(e.date+"T12:00").getDate()}</b><small>{new Date(e.date+"T12:00").toLocaleString(undefined,{month:"short"}).toUpperCase()}</small></div><div className="eventMain"><strong>{e.title}</strong><span><Clock size={14}/>{e.time} · <MapPin size={14}/>{e.location}</span></div><AvatarStack ids={Object.keys(e.attendees).filter(id=>e.attendees[id]==="yes")} users={users}/></div>):<Empty text="No events yet. Create the first one."/>}
-      </section>
-      <section className="panel"><div className="panelHead"><div><small>TEST GUIDE</small><h3>What friends should try</h3></div></div>
-        <div className="checkList"><span><Check/> Create an account</span><span><Check/> Add an event and RSVP</span><span><Check/> Add a holiday</span><span><Check/> Send chat messages</span><span><Check/> Upload a photo</span><span><Check/> Submit feedback</span></div>
-      </section>
+
+    <section className="quickActionsPanel">
+      <div><small>CREEAZĂ RAPID</small><h3>Adaugă ceva în cerc</h3></div>
+      <div className="quickActions">
+        <button onClick={()=>{setEditingEvent(null);setEventOpen(true)}}><CalendarCheck/><span><strong>Eveniment</strong><small>Dată, oră și locație</small></span></button>
+        <button onClick={()=>setView("groups")}><Users/><span><strong>Grup</strong><small>Invită prietenii</small></span></button>
+        <button onClick={()=>setView("media")}><Images/><span><strong>Album</strong><small>Poze și videoclipuri</small></span></button>
+        <button onClick={()=>setView("holidays")}><Plane/><span><strong>Vacanță</strong><small>Arată disponibilitatea</small></span></button>
+      </div>
+    </section>
+
+    <div className="statsGrid compactStats">
+      <Stat icon={<CalendarDays/>} label="Upcoming events" value={String(upcoming.length)} note="In the active group"/>
+      <Stat icon={<Users/>} label="Circle members" value={String(users.length)} note="Local beta testers"/>
+      <Stat icon={<Plane/>} label="Holiday plans" value={String(holidays.length)} note="Compare availability"/>
+      <Stat icon={<MessageSquareText/>} label="Feedback" value="Open" note="Help shape the app"/>
     </div>
   </div>
 }
