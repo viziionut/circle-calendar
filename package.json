@@ -1,6 +1,6 @@
 {
   "name": "circle-calendar",
-  "version": "0.5.1",
+  "version": "5.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

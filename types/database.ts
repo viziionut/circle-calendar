@@ -49,3 +49,31 @@ export type EventMedia = {
   created_at: string;
   signed_url?: string;
 };
+
+export type Vacation = {
+  id: string;
+  group_id: string;
+  user_id: string;
+  country: string;
+  start_date: string;
+  end_date: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type VacationInsert = {
+  group_id: string;
+  user_id: string;
+  country: string;
+  start_date: string;
+  end_date: string;
+  notes?: string | null;
+};
+
+export type VacationUpdate = {
+  country?: string;
+  start_date?: string;
+  end_date?: string;
+  notes?: string | null;
+};
