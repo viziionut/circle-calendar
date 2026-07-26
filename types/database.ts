@@ -18,6 +18,15 @@ export type Group = {
   owner_id: string;
 };
 
+export type GroupRole = "owner" | "admin" | "member";
+
+export type GroupMember = {
+  group_id: string;
+  user_id: string;
+  role: GroupRole;
+  joined_at: string;
+};
+
 export type EventItem = {
   id: string;
   group_id: string;
