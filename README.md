@@ -1,17 +1,22 @@
-# Circle Calendar v0.3
+# Circle Calendar v0.4
 
-Prima versiune conectată la Supabase.
+Versiune conectată la Supabase, cu navigare restaurată și flux complet de grupuri.
 
 ## Include
 - autentificare reală Supabase;
-- profil creat automat prin trigger;
-- grupuri reale;
-- evenimente salvate și sincronizate;
-- upload multiplu foto/video direct în eveniment;
-- album automat pentru fiecare eveniment;
-- arhivă „Circle Memories”;
-- UI responsive și navigare mobilă;
-- structură pregătită pentru reutilizarea logicii în aplicația Expo/React Native.
+- profil și setări de cont (nume, username, avatar, Bro/Girls, temă);
+- creare grup;
+- intrare într-un grup cu un cod sau link de invitație;
+- distribuire invitație, copiere cod și copiere link;
+- evenimente și media în Supabase;
+- UI responsive și navigare mobilă.
+
+## Actualizare de la v0.3
+Rulează în Supabase SQL Editor:
+
+`supabase/migrations/003_group_invites.sql`
+
+Aceasta instalează funcția securizată `join_group_by_invite_code`.
 
 ## Configurare locală
 1. Copiază `.env.local.example` în `.env.local`.
@@ -22,6 +27,3 @@ Prima versiune conectată la Supabase.
 Setează variabilele:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-
-## Important
-Schema SQL a fost deja rulată în Supabase. Migrarea este păstrată în repository doar pentru istoric și instalări viitoare.
