@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import type { Brand, EventItem, EventMedia, Group, Profile, Vacation } from "@/types/database";
 import { EventModal } from "./EventModal";
 import { VacationsPage } from "./VacationsPage";
+import { AdminNavItem } from "./admin/AdminNavItem";
 
 type View = "home" | "calendar" | "vacations" | "media" | "groups" | "settings";
 type Dialog = "create" | "join" | "invite" | null;
@@ -184,6 +185,7 @@ export function AppShell({ session }: { session: Session }) {
         <button onClick={() => { setDialog("join"); setMenuOpen(false); }}><UserPlus/>Intră într-un grup</button>
         <button onClick={() => { setDialog("invite"); setMenuOpen(false); }}><Send/>Invită membri</button>
         <button className={view === "settings" ? "active" : ""} onClick={() => openView("settings")}><Settings/>Setări cont</button>
+        <AdminNavItem onNavigate={() => setMenuOpen(false)}/>
       </nav>
       <button className="inviteBox" onClick={() => setDialog("invite")}><small>COD INVITAȚIE</small><strong>{activeGroup?.invite_code}</strong><span><Share2/> Invită</span></button>
       <button className="logout" onClick={() => supabase.auth.signOut()}><LogOut/> Log out</button>

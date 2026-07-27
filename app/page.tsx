@@ -5,6 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { AuthScreen } from "@/components/AuthScreen";
 import { AppShell } from "@/components/AppShell";
+import { AccountActivityGuard } from "@/components/AccountActivityGuard";
 
 export default function Page() {
   const [session, setSession] = useState<Session | null>(null);
@@ -17,5 +18,5 @@ export default function Page() {
   }, []);
 
   if (!ready) return <main className="loadingPage">Se încarcă…</main>;
-  return session ? <AppShell session={session}/> : <AuthScreen/>;
+  return session ? <AccountActivityGuard session={session}><AppShell session={session}/></AccountActivityGuard> : <AuthScreen/>;
 }

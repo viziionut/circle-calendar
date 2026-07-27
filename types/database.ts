@@ -8,6 +8,29 @@ export type Profile = {
   avatar_url: string | null;
   brand: Brand;
   theme: string;
+  created_at?: string;
+  last_seen_at?: string | null;
+  account_status?: "active" | "suspended";
+  suspended_at?: string | null;
+  suspended_reason?: string | null;
+};
+
+export type AppAdminRole = "owner" | "admin";
+
+export type AppAdmin = {
+  user_id: string;
+  role: AppAdminRole;
+  created_at: string;
+  created_by: string;
+};
+
+export type AdminAuditLog = {
+  id: string;
+  admin_user_id: string;
+  action: string;
+  target_user_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
 };
 
 export type Group = {
