@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarDays, ChevronRight, Flame, Plane, Sparkles, TrendingUp, Users } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { EventItem, Group, Profile, Vacation } from "@/types/database";
 import { PendingQuickPlans } from "@/components/quick-plan/QuickPlan";
@@ -16,7 +16,7 @@ function initials(profile: Profile | null) {
 }
 
 export const MobileDashboard = memo(function MobileDashboard({
-  profile, groups, activeGroupId, currentUserId, events, vacations, onEvent, onCalendar, onVacations,
+  profile, groups, activeGroupId, currentUserId, events, vacations, onEvent, onCalendar, onVacations, onRefresh,
 }: {
   profile: Profile | null;
   groups: Group[];
@@ -27,8 +27,11 @@ export const MobileDashboard = memo(function MobileDashboard({
   onEvent: (event: EventItem) => void;
   onCalendar: () => void;
   onVacations: () => void;
+  onRefresh: () => Promise<void>;
 }) {
   const [recommendation, setRecommendation] = useState<any>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const pullStart = useRef(0);
   const upcoming = useMemo(() => events.filter(event => event.event_date >= new Date().toISOString().slice(0, 10)), [events]);
   const nextEvent = upcoming[0];
   const today = new Date();
@@ -56,7 +59,14 @@ export const MobileDashboard = memo(function MobileDashboard({
 
   useEffect(() => { void loadRecommendation(); }, [loadRecommendation]);
 
-  return <div className="mobileDashboard">
+  async function refresh() {
+    setRefreshing(true);
+    await Promise.all([onRefresh(), loadRecommendation()]);
+    setRefreshing(false);
+  }
+
+  return <div className="mobileDashboard" onTouchStart={event=>{if(window.scrollY===0)pullStart.current=event.touches[0].clientY}} onTouchEnd={event=>{if(pullStart.current&&event.changedTouches[0].clientY-pullStart.current>85)void refresh();pullStart.current=0}}>
+    <div className={`mobileRefreshIndicator ${refreshing?"active":""}`}><span className={refreshing?"spin":""}>↻</span>{refreshing?"Se sincronizează...":"Trage pentru actualizare"}</div>
     <section className="mobileHeroCard">
       <div className="mobileHeroTop">
         <div><small>BUN VENIT ÎN CERCUL TĂU</small><h1>Salut, {profile?.display_name?.split(" ")[0] || profile?.username || "prietene"}</h1><p>Planurile voastre, într-un singur loc.</p></div>
