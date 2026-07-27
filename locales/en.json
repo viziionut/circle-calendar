@@ -110,6 +110,34 @@
       "quick_plan_response_due": { "title": "Response needed", "message": "“{title}” is still waiting for your vote." }
     }
   },
+  "quickPlan": {
+    "migrationRequired": "Quick Plan is not installed in this Supabase project. Run migration 008_quick_plan.sql and reload the schema.",
+    "step": "STEP {step}",
+    "minimumTitle": "Minimum participants",
+    "people": "{count} {count, plural, one {person} other {people}}",
+    "allRequired": "All members must be available.",
+    "oneMayMiss": "The plan can be suggested even if one person is unavailable.",
+    "severalMayMiss": "The plan can be suggested even if {count} people are unavailable.",
+    "threshold": "Every option must have at least {count} available participants.",
+    "summary": "SUMMARY",
+    "period": "Period",
+    "duration": "Duration",
+    "minimum": "minimum {count} {count, plural, one {participant} other {participants}}",
+    "find": "Find",
+    "noOptions": "No period matches all filters. Extend the date range or lower the threshold.",
+    "errors": {
+      "rsvps": "Events could not be checked. Please try again.",
+      "create": "The plan could not be created. Please try again.",
+      "options": "The options could not be saved. Please try again.",
+      "generic": "The search could not be completed. Please try again."
+    },
+    "searchPhases": {
+      "0": "Analysing calendars...",
+      "1": "Checking events...",
+      "2": "Comparing available periods...",
+      "3": "Calculating the best options..."
+    }
+  },
   "errors": {
     "accessChecking": "Checking access…",
     "suspended": "Account suspended",

@@ -110,6 +110,34 @@
       "quick_plan_response_due": { "title": "Răspuns necesar", "message": "Planul „{title}” încă așteaptă votul tău." }
     }
   },
+  "quickPlan": {
+    "migrationRequired": "Quick Plan nu este instalat în acest proiect Supabase. Rulează migrarea 008_quick_plan.sql și reîncarcă schema.",
+    "step": "PASUL {step}",
+    "minimumTitle": "Participanți minimi",
+    "people": "{count} {count, plural, one {persoană} other {persoane}}",
+    "allRequired": "Toți membrii trebuie să fie disponibili.",
+    "oneMayMiss": "Planul poate fi propus chiar dacă lipsește o persoană.",
+    "severalMayMiss": "Planul poate fi propus chiar dacă lipsesc {count} persoane.",
+    "threshold": "Orice variantă trebuie să aibă cel puțin {count} participanți disponibili.",
+    "summary": "REZUMAT",
+    "period": "Perioadă",
+    "duration": "Durată",
+    "minimum": "minimum {count} {count, plural, one {participant} other {participanți}}",
+    "find": "Găsește",
+    "noOptions": "Nu am găsit nicio perioadă care respectă toate filtrele. Extinde intervalul sau micșorează pragul.",
+    "errors": {
+      "rsvps": "Evenimentele nu au putut fi verificate. Încearcă din nou.",
+      "create": "Planul nu a putut fi creat. Încearcă din nou.",
+      "options": "Variantele nu au putut fi salvate. Încearcă din nou.",
+      "generic": "Căutarea nu a putut fi finalizată. Încearcă din nou."
+    },
+    "searchPhases": {
+      "0": "Analizez calendarele...",
+      "1": "Verific evenimentele...",
+      "2": "Compar perioadele disponibile...",
+      "3": "Calculez cele mai bune variante..."
+    }
+  },
   "errors": {
     "accessChecking": "Se verifică accesul…",
     "suspended": "Cont suspendat",

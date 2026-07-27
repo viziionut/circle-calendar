@@ -8,6 +8,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { calculateQuickPlanOptions, shiftIsoDate } from "@/lib/quickPlan";
+import { useI18n } from "@/lib/i18n";
 import type {
   EventItem, Group, QuickPlanPreference, QuickPlanVoteValue, QuickPlanWithDetails, Vacation,
 } from "@/types/database";
@@ -27,12 +28,12 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function formatPeriod(start: string, end: string) {
+function formatPeriod(start: string, end: string, locale = "ro-RO") {
   const startDate = new Date(`${start}T12:00:00`);
   const endDate = new Date(`${end}T12:00:00`);
-  if (start === end) return startDate.toLocaleDateString("ro-RO", { day: "numeric", month: "long" });
+  if (start === end) return startDate.toLocaleDateString(locale, { day: "numeric", month: "long" });
   const sameMonth = startDate.getMonth() === endDate.getMonth();
-  return `${startDate.getDate()}${sameMonth ? "" : ` ${startDate.toLocaleDateString("ro-RO", { month: "short" })}`}–${endDate.toLocaleDateString("ro-RO", { day: "numeric", month: "long" })}`;
+  return `${startDate.getDate()}${sameMonth ? "" : ` ${startDate.toLocaleDateString(locale, { month: "short" })}`}–${endDate.toLocaleDateString(locale, { day: "numeric", month: "long" })}`;
 }
 
 function normalizePlans(rows: any[]): QuickPlanWithDetails[] {
@@ -54,6 +55,7 @@ export function QuickPlanSection({
   events: EventItem[];
   vacations: Vacation[];
 }) {
+  const { t } = useI18n();
   const [plans, setPlans] = useState<QuickPlanWithDetails[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -68,7 +70,7 @@ export function QuickPlanSection({
       .neq("status", "cancelled")
       .order("created_at", { ascending: false });
     if (queryError) {
-      setError(queryError.message.includes("quick_plans") ? "Rulează migrarea 008_quick_plan.sql în Supabase." : queryError.message);
+      setError(queryError.message.includes("quick_plans") ? t("quickPlan.migrationRequired") : queryError.message);
     } else {
       const normalized = normalizePlans(data || []);
       setPlans(normalized);
@@ -77,7 +79,7 @@ export function QuickPlanSection({
       setError("");
     }
     setLoading(false);
-  }, [groupId]);
+  }, [groupId, t]);
 
   useEffect(() => {
     void loadPlans();
@@ -131,6 +133,7 @@ function QuickPlanWizard({
   groupId: string; currentUserId: string; memberIds: string[]; events: EventItem[]; vacations: Vacation[];
   onClose: () => void; onCreated: (planId: string) => Promise<void>;
 }) {
+  const { localeTag, t } = useI18n();
   const defaultEnd = shiftIsoDate(today(), 60);
   const [step, setStep] = useState(1);
   const [activity, setActivity] = useState<(typeof ACTIVITIES)[number] | null>(null);
@@ -142,41 +145,62 @@ function QuickPlanWizard({
   const [preference, setPreference] = useState<QuickPlanPreference>("any");
   const [minimumParticipants, setMinimumParticipants] = useState(Math.max(2, memberIds.length - 1));
   const [finding, setFinding] = useState(false);
+  const [searchPhase, setSearchPhase] = useState(0);
   const [error, setError] = useState("");
   const title = customActivity.trim() || activity?.[2] || "";
   const emoji = activity?.[1] || "✨";
   const valid = step === 1 ? Boolean(title) : step === 2 ? searchStart <= searchEnd : true;
+  const unavailableMembers = Math.max(0, memberIds.length - minimumParticipants);
+  const participantContext = unavailableMembers === 0
+    ? t("quickPlan.allRequired")
+    : unavailableMembers === 1
+      ? t("quickPlan.oneMayMiss")
+      : unavailableMembers > 1
+        ? t("quickPlan.severalMayMiss", { count: unavailableMembers })
+        : t("quickPlan.threshold", { count: minimumParticipants });
+
+  useEffect(() => {
+    if (!finding) { setSearchPhase(0); return; }
+    const timer = window.setInterval(() => setSearchPhase(current => Math.min(3, current + 1)), 180);
+    return () => window.clearInterval(timer);
+  }, [finding]);
 
   async function findDates() {
+    if (finding) return;
+    const startedAt = Date.now();
     setFinding(true);
     setError("");
-    const eventIds = events.map(event => event.id);
-    const { data: rsvps, error: rsvpError } = eventIds.length
-      ? await supabase.from("event_rsvps").select("event_id,user_id,status").in("event_id", eventIds)
-      : { data: [], error: null };
-    if (rsvpError) { setError(rsvpError.message); setFinding(false); return; }
-    const options = calculateQuickPlanOptions({
-      searchStart, searchEnd, durationDays, preference, minimumParticipants,
-      memberIds, events, eventRsvps: (rsvps || []) as any, vacations,
-    });
-    if (!options.length) {
-      setError("Nu am găsit nicio perioadă care respectă toate filtrele. Extinde intervalul sau micșorează pragul.");
+    try {
+      const eventIds = events.map(event => event.id);
+      const { data: rsvps, error: rsvpError } = eventIds.length
+        ? await supabase.from("event_rsvps").select("event_id,user_id,status").in("event_id", eventIds)
+        : { data: [], error: null };
+      if (rsvpError) throw new Error(t("quickPlan.errors.rsvps"));
+      const options = calculateQuickPlanOptions({
+        searchStart, searchEnd, durationDays, preference, minimumParticipants,
+        memberIds, events, eventRsvps: (rsvps || []) as any, vacations,
+      });
+      if (!options.length) throw new Error(t("quickPlan.noOptions"));
+      const { data: plan, error: planError } = await supabase.from("quick_plans").insert({
+        group_id: groupId, created_by: currentUserId, title,
+        activity_key: activity?.[0] || "custom", activity_emoji: emoji,
+        search_start: searchStart, search_end: searchEnd, duration_days: durationDays,
+        preference, minimum_participants: minimumParticipants,
+      }).select().single();
+      if (planError || !plan) throw new Error(planError?.message.includes("quick_plans") ? t("quickPlan.migrationRequired") : t("quickPlan.errors.create"));
+      const { error: optionsError } = await supabase.from("quick_plan_options").insert(options.map(option => ({ ...option, plan_id: plan.id })));
+      if (optionsError) {
+        await supabase.from("quick_plans").delete().eq("id", plan.id);
+        throw new Error(t("quickPlan.errors.options"));
+      }
+      const remaining = 620 - (Date.now() - startedAt);
+      if (remaining > 0) await new Promise(resolve => window.setTimeout(resolve, remaining));
+      await onCreated(plan.id);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : t("quickPlan.errors.generic"));
+    } finally {
       setFinding(false);
-      return;
     }
-    const { data: plan, error: planError } = await supabase.from("quick_plans").insert({
-      group_id: groupId, created_by: currentUserId, title,
-      activity_key: activity?.[0] || "custom", activity_emoji: emoji,
-      search_start: searchStart, search_end: searchEnd, duration_days: durationDays,
-      preference, minimum_participants: minimumParticipants,
-    }).select().single();
-    if (planError) { setError(planError.message); setFinding(false); return; }
-    const { error: optionsError } = await supabase.from("quick_plan_options").insert(options.map(option => ({ ...option, plan_id: plan.id })));
-    if (optionsError) {
-      await supabase.from("quick_plans").delete().eq("id", plan.id);
-      setError(optionsError.message); setFinding(false); return;
-    }
-    await onCreated(plan.id);
   }
 
   return <div className="quickPlanModalBack">
@@ -188,10 +212,10 @@ function QuickPlanWizard({
         {step === 2 && <div className="quickPlanStep"><small>PASUL 2</small><h2>În ce perioadă căutăm?</h2><p>Vom analiza fiecare interval posibil dintre aceste date.</p><div className="quickDateRange"><label><span>DE LA</span><input type="date" min={today()} value={searchStart} onChange={event => setSearchStart(event.target.value)}/></label><i>—</i><label><span>PÂNĂ LA</span><input type="date" min={searchStart} value={searchEnd} onChange={event => setSearchEnd(event.target.value)}/></label></div></div>}
         {step === 3 && <div className="quickPlanStep"><small>PASUL 3</small><h2>Cât durează?</h2><p>Perioadele propuse vor avea exact durata aleasă.</p><div className="durationGrid">{DURATIONS.map(option => <button key={option[0]} className={durationDays === option[2] ? "active" : ""} onClick={() => setDurationDays(option[2])}><Clock3/><strong>{option[1]}</strong><small>{option[2]} {option[2] === 1 ? "zi" : "zile"}</small></button>)}<button className={!DURATIONS.some(option => option[2] === durationDays) ? "active" : ""} onClick={() => setDurationDays(customDuration)}><Plus/><strong>Personalizat</strong><small>{customDuration} zile</small></button></div><label className="customDuration">Durată personalizată<input type="number" min={1} max={31} value={customDuration} onChange={event => { const value = Number(event.target.value); setCustomDuration(value); setDurationDays(value); }}/></label></div>}
         {step === 4 && <div className="quickPlanStep"><small>PASUL 4</small><h2>Ce zile preferați?</h2><p>Filtrul se aplică întregii durate a planului.</p><div className="preferenceList">{([["weekend","Doar weekend","Sâmbătă și duminică"],["weekdays","Doar zile lucrătoare","Luni până vineri"],["any","Orice","Cea mai bună disponibilitate"]] as const).map(option => <button key={option[0]} className={preference === option[0] ? "active" : ""} onClick={() => setPreference(option[0])}><span>{preference === option[0] && <Check/>}</span><div><strong>{option[1]}</strong><small>{option[2]}</small></div></button>)}</div></div>}
-        {step === 5 && <div className="quickPlanStep"><small>PASUL 5</small><h2>Câți trebuie să poată participa?</h2><p>Variantele sub acest prag nu vor fi propuse.</p><div className="participantGauge"><div><strong>{minimumParticipants}</strong><span>din {memberIds.length} membri</span></div><input type="range" min={Math.min(2, memberIds.length)} max={Math.max(2, memberIds.length)} value={minimumParticipants} onChange={event => setMinimumParticipants(Number(event.target.value))}/><div className="rangeLabels"><span>2</span><span>{memberIds.length}</span></div></div><div className="quickPlanSummary"><Sparkles/><div><small>REZUMAT</small><strong>{emoji} {title} · {durationDays} {durationDays === 1 ? "zi" : "zile"}</strong><span>{formatPeriod(searchStart, searchEnd)} · minimum {minimumParticipants} participanți</span></div></div></div>}
+        {step === 5 && <div className="quickPlanStep quickPlanFinalStep"><small>{t("quickPlan.step", { step: 5 })}</small><h2>{t("quickPlan.minimumTitle")}</h2><div className="participantGauge"><div className="participantValue"><strong>{t("quickPlan.people", { count: minimumParticipants })}</strong><span>{participantContext}</span></div><input aria-label={t("quickPlan.minimumTitle")} type="range" min={Math.min(2, memberIds.length)} max={Math.max(2, memberIds.length)} value={minimumParticipants} onChange={event => setMinimumParticipants(Number(event.target.value))}/><div className="rangeLabels"><span>2</span><span>{memberIds.length}</span></div></div><div className="quickPlanSummary"><div className="summaryActivity"><span>{emoji}</span><div><small>{t("quickPlan.summary")}</small><strong>{title}</strong></div></div><dl><div><dt>📅 {t("quickPlan.period")}</dt><dd>{formatPeriod(searchStart, searchEnd, localeTag)}</dd></div><div><dt>⏱ {t("quickPlan.duration")}</dt><dd>{t("common.days", { count: durationDays })}</dd></div><div><dt>👥 {t("quickPlan.minimumTitle")}</dt><dd>{t("quickPlan.minimum", { count: minimumParticipants })}</dd></div></dl></div></div>}
         {error && <div className="quickPlanInlineError">{error}</div>}
       </div>
-      <footer><button className="secondary" disabled={step === 1 || finding} onClick={() => setStep(value => value - 1)}><ArrowLeft/> Înapoi</button>{step < 5 ? <button className="primary" disabled={!valid} onClick={() => setStep(value => value + 1)}>Continuă <ArrowRight/></button> : <button className="primary findButton" disabled={finding} onClick={() => void findDates()}>{finding ? <><Loader2 className="spin"/> Analizăm calendarele...</> : <><Sparkles/> Găsește</>}</button>}</footer>
+      <footer><button className="secondary" disabled={step === 1 || finding} onClick={() => setStep(value => value - 1)}><ArrowLeft/> {t("common.back")}</button>{step < 5 ? <button className="primary" disabled={!valid} onClick={() => setStep(value => value + 1)}>{t("common.continue")} <ArrowRight/></button> : <button className="primary findButton" disabled={finding} aria-busy={finding} onClick={() => void findDates()}>{finding ? <><Loader2 className="spin"/> <span key={searchPhase} className="searchPhaseText">{t(`quickPlan.searchPhases.${searchPhase}`)}</span></> : <><Sparkles/> {t("quickPlan.find")}</>}</button>}</footer>
     </section>
   </div>;
 }
