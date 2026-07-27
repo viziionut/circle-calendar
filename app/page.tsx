@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { AuthScreen } from "@/components/AuthScreen";
 import { AppShell } from "@/components/AppShell";
 import { AccountActivityGuard } from "@/components/AccountActivityGuard";
+import { BrandLoader } from "@/components/Brand";
 
 export default function Page() {
   const [session, setSession] = useState<Session | null>(null);
@@ -17,6 +18,6 @@ export default function Page() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  if (!ready) return <main className="loadingPage">Se încarcă…</main>;
+  if (!ready) return <main className="loadingPage"><BrandLoader/></main>;
   return session ? <AccountActivityGuard session={session}><AppShell session={session}/></AccountActivityGuard> : <AuthScreen/>;
 }

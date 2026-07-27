@@ -72,7 +72,8 @@ export function QuickPlanSection({
     } else {
       const normalized = normalizePlans(data || []);
       setPlans(normalized);
-      setSelectedPlanId(current => normalized.some(plan => plan.id === current) ? current : normalized[0]?.id || "");
+      const requestedPlan = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("plan") : "";
+      setSelectedPlanId(current => normalized.some(plan => plan.id === current) ? current : normalized.find(plan => plan.id === requestedPlan)?.id || normalized[0]?.id || "");
       setError("");
     }
     setLoading(false);
@@ -99,7 +100,7 @@ export function QuickPlanSection({
       <button className="primary quickPlanLaunchButton" onClick={() => setWizardOpen(true)}><CalendarCheck/> Găsește următoarea dată <ChevronRight/></button>
     </section>
 
-    <section className="hubSection quickPlansSection">
+    <section className="hubSection quickPlansSection" id="quick-plan">
       <header><div><small>DECIZII ÎMPREUNĂ</small><h2>Planuri în desfășurare</h2><p>Propuneri, progresul voturilor și recomandarea curentă.</p></div><span className="quickPlanCount">{plans.filter(plan => plan.status === "voting").length} active</span></header>
       {loading ? <QuickPlanSkeleton/> : error ? <div className="quickPlanError"><CircleHelp/><p>{error}</p></div> : plans.length ? <>
         <div className="quickPlanTabs">{plans.map(plan => {

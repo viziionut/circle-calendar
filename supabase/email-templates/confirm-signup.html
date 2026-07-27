@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>Confirmă contul Circle Calendar</title>
+  <style>@media only screen and (max-width:620px){.shell{width:100%!important}.pad{padding-left:22px!important;padding-right:22px!important}.title{font-size:28px!important}.button{display:block!important;width:auto!important;text-align:center!important}.feature{display:block!important;width:100%!important}}</style>
+</head>
+<body style="margin:0;padding:0;background:#030711;color:#f7fbff;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Contul tău este aproape gata. Confirmă adresa de email.</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#030711;">
+    <tr><td align="center" style="padding:32px 12px;">
+      <table role="presentation" class="shell" width="600" cellspacing="0" cellpadding="0" border="0" style="width:600px;max-width:600px;">
+        <tr><td align="center" style="padding:4px 0 24px;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+            <td style="width:52px;height:52px;"><img src="{{ .SiteURL }}/brand/icon.svg" width="52" height="52" alt="Circle Calendar" style="display:block;width:52px;height:52px;border:0;border-radius:15px;"></td>
+            <td style="padding-left:12px;text-align:left;"><div style="font-size:17px;font-weight:800;color:#ffffff;">Circle Calendar</div><div style="padding-top:3px;font-size:9px;letter-spacing:2px;color:#7f9ab5;">PLAN. SHARE. REMEMBER.</div></td>
+          </tr></table>
+        </td></tr>
+        <tr><td class="pad" style="padding:42px 44px;border:1px solid #17283c;border-radius:26px;background:#0a1423;box-shadow:0 24px 70px rgba(0,0,0,.35);">
+          <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:#45d7ff;">BUN VENIT ÎN CERCUL TĂU</div>
+          <h1 class="title" style="margin:14px 0 10px;font-size:34px;line-height:1.15;letter-spacing:-1px;color:#ffffff;">Bine ai venit în<br>Circle Calendar!</h1>
+          <p style="margin:0 0 8px;font-size:17px;line-height:1.6;color:#c6d5e5;">Contul tău este aproape gata.</p>
+          <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#8fa5bd;">Confirmă adresa de email pentru a începe.</p>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;"><tr><td bgcolor="#22c5ee" style="border-radius:14px;">
+            <a class="button" href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:15px 30px;border-radius:14px;background:#22c5ee;color:#03111c;text-decoration:none;font-size:15px;font-weight:800;">Confirmă contul&nbsp; →</a>
+          </td></tr></table>
+          <p style="margin:0 0 8px;font-size:12px;line-height:1.6;color:#7f94ab;">Dacă butonul nu funcționează, folosește linkul de mai jos:</p>
+          <p style="margin:0;padding:12px 14px;border:1px solid #17283c;border-radius:10px;background:#07101d;font-size:11px;line-height:1.6;word-break:break-all;"><a href="{{ .ConfirmationURL }}" style="color:#45d7ff;text-decoration:none;">{{ .ConfirmationURL }}</a></p>
+          <div style="height:1px;margin:32px 0;background:#17283c;"></div>
+          <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#dbe8f5;">Circle Calendar te ajută să organizezi mai ușor:</p>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr><td class="feature" width="50%" style="padding:7px 0;color:#9db1c6;font-size:13px;">• ieșiri cu prietenii</td><td class="feature" width="50%" style="padding:7px 0;color:#9db1c6;font-size:13px;">• vacanțe</td></tr>
+            <tr><td class="feature" width="50%" style="padding:7px 0;color:#9db1c6;font-size:13px;">• evenimente</td><td class="feature" width="50%" style="padding:7px 0;color:#9db1c6;font-size:13px;">• planuri de grup</td></tr>
+          </table>
+        </td></tr>
+        <tr><td align="center" style="padding:26px 20px;color:#647a91;font-size:11px;line-height:1.8;">© Circle Calendar<br><span style="color:#8ca2b9;">Plan. Share. Remember.</span><br>Acest email a fost trimis automat.</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

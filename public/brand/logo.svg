@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 220" role="img" aria-labelledby="title">
+  <title id="title">Circle Calendar — Plan. Share. Remember.</title>
+  <defs><linearGradient id="g" x1="30" y1="20" x2="205" y2="204" gradientUnits="userSpaceOnUse"><stop stop-color="#45D7FF"/><stop offset="1" stop-color="#6C63FF"/></linearGradient></defs>
+  <g transform="translate(10 10) scale(.39)">
+    <circle cx="256" cy="256" r="174" fill="none" stroke="url(#g)" stroke-width="28"/><path d="M170 225h172M205 166v42M307 166v42" fill="none" stroke="#EAF8FF" stroke-width="22" stroke-linecap="round"/><rect x="165" y="183" width="182" height="164" rx="38" fill="#0D1B2D" stroke="#9DEBFF" stroke-width="12"/><path d="M216 267l40 30 47-58" fill="none" stroke="url(#g)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/><path d="M130 144l53 36M382 144l-53 36M256 430v-72" fill="none" stroke="#45D7FF" stroke-width="12" stroke-linecap="round"/><circle cx="121" cy="137" r="20" fill="#45D7FF"/><circle cx="391" cy="137" r="20" fill="#6C63FF"/><circle cx="256" cy="439" r="20" fill="#30D99B"/>
+  </g>
+  <text x="232" y="103" fill="#F7FBFF" font-family="Arial,Helvetica,sans-serif" font-size="58" font-weight="800" letter-spacing="-2">Circle Calendar</text>
+  <text x="235" y="148" fill="#8FA5BD" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="700" letter-spacing="5">PLAN. SHARE. REMEMBER.</text>
+</svg>

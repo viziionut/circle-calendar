@@ -6,6 +6,7 @@ import type { Session } from "@supabase/supabase-js";
 import { AuthScreen } from "@/components/AuthScreen";
 import { GroupHub } from "@/components/groups/GroupHub";
 import { supabase } from "@/lib/supabase";
+import { BrandLoader } from "@/components/Brand";
 
 export default function GroupHubPage() {
   const params = useParams<{ groupId: string }>();
@@ -21,7 +22,7 @@ export default function GroupHubPage() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  if (!ready) return <main className="loadingPage">Se încarcă Group Hub…</main>;
+  if (!ready) return <main className="loadingPage"><BrandLoader label="Se încarcă Group Hub…"/></main>;
   if (!session) return <AuthScreen/>;
   return <GroupHub groupId={params.groupId} currentUserId={session.user.id}/>;
 }

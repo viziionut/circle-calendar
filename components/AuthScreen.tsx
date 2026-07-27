@@ -1,9 +1,10 @@
 "use client";
 
-import { CalendarHeart, ChevronRight, UserRound } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Brand } from "@/types/database";
+import { BrandLogo, BrandMark } from "./Brand";
 
 export function AuthScreen() {
   const [brand, setBrand] = useState<Brand>("bros");
@@ -37,7 +38,7 @@ export function AuthScreen() {
 
   if (mode === "landing") {
     return <main className={`landing ${brand}`}>
-      <header className="landingHeader"><div className="logo"><CalendarHeart/><strong>Circle Calendar</strong></div><button className="textButton" onClick={() => setMode("login")}>Log in</button></header>
+      <header className="landingHeader"><div className="logo"><BrandLogo/></div><button className="textButton" onClick={() => setMode("login")}>Log in</button></header>
       <section className="hero">
         <span className="eyebrow">PRIVATE SOCIAL CALENDAR</span>
         <h1>Plan together.<br/><em>Remember forever.</em></h1>
@@ -54,7 +55,7 @@ export function AuthScreen() {
   return <main className={`authPage ${brand}`}>
     <section className="authCard">
       <button className="textButton" onClick={() => setMode("landing")}>← Înapoi</button>
-      <div className="authIcon"><UserRound/></div>
+      <div className="authBrand"><BrandMark/><span>Plan. Share. Remember.</span></div>
       <h1>{mode === "login" ? "Bine ai revenit" : "Creează cont"}</h1>
       <p>{mode === "login" ? "Intră în cercul tău." : `Experiența aleasă: ${brand === "bros" ? "Bro's" : "Girls'"}.`}</p>
       <form onSubmit={submit} className="formStack">

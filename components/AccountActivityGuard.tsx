@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { BrandLoader } from "./Brand";
 
 const UPDATE_INTERVAL = 12 * 60 * 1000;
 
@@ -42,7 +43,7 @@ export function AccountActivityGuard({ session, children }: { session: Session; 
     };
   }, [session.user.id]);
 
-  if (!ready) return <main className="loadingPage">Se verifică accesul…</main>;
+  if (!ready) return <main className="loadingPage"><BrandLoader label="Se verifică accesul…"/></main>;
   if (blockedReason) return <main className="accountSuspended"><h1>Cont suspendat</h1><p>{blockedReason}</p><span>Contactează administratorul aplicației pentru detalii.</span></main>;
   return <>{children}</>;
 }

@@ -160,3 +160,38 @@ export type QuickPlanVote = {
 export type QuickPlanWithDetails = QuickPlan & {
   options: Array<QuickPlanOption & { votes: QuickPlanVote[] }>;
 };
+
+export type NotificationType =
+  | "group_invitation" | "group_member_joined"
+  | "event_created" | "event_updated" | "event_cancelled"
+  | "quick_plan_created" | "quick_plan_vote_requested" | "quick_plan_voted"
+  | "quick_plan_last_vote" | "quick_plan_confirmed" | "quick_plan_event_created"
+  | "quick_plan_comment" | "vacation_created"
+  | "event_tomorrow" | "quick_plan_response_due";
+
+export type AppNotification = {
+  id: string;
+  user_id: string;
+  group_id: string | null;
+  actor_id: string | null;
+  type: NotificationType;
+  title: string;
+  message: string;
+  entity_type: "group" | "event" | "quick_plan" | "vacation" | null;
+  entity_id: string | null;
+  metadata: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+  read_at: string | null;
+  actor?: Profile | null;
+};
+
+export type NotificationPreferences = {
+  user_id: string;
+  groups_enabled: boolean;
+  events_enabled: boolean;
+  quick_plans_enabled: boolean;
+  vacations_enabled: boolean;
+  reminders_enabled: boolean;
+  updated_at: string;
+};

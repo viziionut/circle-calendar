@@ -1,13 +1,14 @@
 "use client";
 
 import {
-  ArrowLeft, CalendarDays, CalendarRange, Copy, MapPin, Plane, RefreshCw,
-  ShieldCheck, UserRound, Users,
+  ArrowLeft, CalendarDays, CalendarRange, Copy, MapPin, Plane,
+  ShieldCheck, Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { EventItem, Group, GroupMember, GroupRole, Profile, Vacation } from "@/types/database";
 import { QuickPlanSection } from "@/components/quick-plan/QuickPlan";
+import { BrandLoader, BrandMark } from "@/components/Brand";
 
 type HubMember = GroupMember & { profile: Profile | null };
 
@@ -149,7 +150,7 @@ export function GroupHub({ groupId, currentUserId }: { groupId: string; currentU
   }, [vacations]);
   const memberById = useMemo(() => new Map(members.map(member => [member.user_id, member])), [members]);
 
-  if (loading) return <main className="groupHubLoading"><RefreshCw className="spin"/> Se încarcă grupul…</main>;
+  if (loading) return <main className="groupHubLoading"><BrandLoader label="Se încarcă grupul…"/></main>;
   if (error || !group) return <main className="groupHubError"><Users/><h1>Grup indisponibil</h1><p>{error || "Nu ai acces la acest grup."}</p><a href="/"><ArrowLeft/> Înapoi în aplicație</a></main>;
 
   async function copyInviteCode() {
@@ -161,7 +162,7 @@ export function GroupHub({ groupId, currentUserId }: { groupId: string; currentU
   return <main className="groupHub">
     <header className="groupHubTopbar">
       <a href="/"><ArrowLeft/> Înapoi</a>
-      <div className="groupHubBrand"><span>CC</span><strong>Group Hub</strong></div>
+      <div className="groupHubBrand"><BrandMark/><strong>Group Hub</strong></div>
       <small>{members.some(member => member.user_id === currentUserId) ? "MEMBRU AL GRUPULUI" : ""}</small>
     </header>
 
@@ -237,5 +238,6 @@ export function GroupHub({ groupId, currentUserId }: { groupId: string; currentU
 }
 
 function HubEmpty({ text }: { text: string }) {
-  return <div className="hubEmpty"><UserRound/><p>{text}</p></div>;
+  const illustration = text.includes("evenimente") ? "events" : text.includes("concedii") || text.includes("destinații") ? "vacations" : "groups";
+  return <div className="hubEmpty"><img className="brandEmptyIllustration" src={`/brand/empty/${illustration}.svg`} alt=""/><p>{text}</p></div>;
 }

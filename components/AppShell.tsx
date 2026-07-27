@@ -2,19 +2,22 @@
 
 import {
   Bell, CalendarDays, Camera, Check, ChevronLeft, ChevronRight, Clipboard, Upload, Maximize2, Minimize2,
-  Home, Images, Link2, LogOut, Menu, Plane, Plus, RefreshCw, Send, Settings,
+  Home, Images, Link2, LogOut, Menu, Plane, Plus, Send, Settings,
   Share2, Sparkles, UserCircle, UserPlus, Users, X
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import type { Brand, EventItem, EventMedia, Group, Profile, Vacation } from "@/types/database";
+import type { AppNotification, Brand, EventItem, EventMedia, Group, NotificationPreferences, Profile, Vacation } from "@/types/database";
 import { EventModal } from "./EventModal";
 import { VacationsPage } from "./VacationsPage";
 import { AdminNavItem } from "./admin/AdminNavItem";
 import { PendingQuickPlans } from "./quick-plan/QuickPlan";
 import { MobileDashboard } from "./mobile/MobileDashboard";
+import { BrandLoader, BrandMark } from "./Brand";
+import { NotificationCenter } from "./notifications/NotificationCenter";
+import { fetchNotificationPreferences, saveNotificationPreferences } from "@/lib/notifications";
 
 type View = "home" | "calendar" | "vacations" | "media" | "groups" | "settings";
 type Dialog = "create" | "join" | "invite" | null;
@@ -169,14 +172,43 @@ export function AppShell({ session }: { session: Session }) {
   }, []);
 
   const openView = (next: View) => { setView(next); setMenuOpen(false); };
+  const openNotification = (notification: AppNotification) => {
+    if (notification.entity_type === "event" && notification.entity_id) {
+      const event = events.find(item => item.id === notification.entity_id);
+      if (event) {
+        setSelectedEvent(event);
+        setSelectedDate(event.event_date);
+        setModalOpen(true);
+      } else {
+        const date = typeof notification.metadata.event_date === "string" ? notification.metadata.event_date : "";
+        if (date) setMonth(new Date(`${date}T12:00:00`));
+        setView("calendar");
+      }
+      return;
+    }
+    if (notification.entity_type === "quick_plan" && notification.group_id) {
+      window.location.assign(`/groups/${notification.group_id}?plan=${notification.entity_id || ""}#quick-plan`);
+      return;
+    }
+    if (notification.entity_type === "group" && notification.group_id) {
+      window.location.assign(`/groups/${notification.group_id}`);
+      return;
+    }
+    if (notification.entity_type === "vacation") {
+      setView("vacations");
+      return;
+    }
+    setView("home");
+  };
 
-  if (loading) return <main className="loadingPage"><RefreshCw className="spin"/> Se conectează la Circle Calendar…</main>;
+  if (loading) return <main className="loadingPage"><BrandLoader label="Se conectează la Circle Calendar…"/></main>;
 
   if (!groups.length) return <main className={`onboarding ${profile?.brand || "bros"}`}>
     <section className="onboardingCard">
-      <span className="onboardingLogo">CC</span>
+      <BrandMark className="onboardingBrandMark"/>
       <small>CIRCLE CALENDAR v6.0</small>
       <h1>Bun venit, {profile?.display_name || "prietene"}</h1>
+      <img className="brandEmptyIllustration" src="/brand/empty/groups.svg" alt=""/>
       <p>Creează un cerc nou sau intră în grupul prietenilor cu un cod de invitație.</p>
       <div className="onboardingActions">
         <button className="primary" onClick={() => setDialog("create")}><Plus/> Creează grup</button>
@@ -194,7 +226,7 @@ export function AppShell({ session }: { session: Session }) {
   return <main className={`app ${profile?.brand || "bros"} theme-${profile?.theme || "neon"}`}>
     <aside className={menuOpen ? "sidebar open" : "sidebar"}>
       <div className="sidebarFixedTop">
-        <div className="sideLogo"><span>CC</span><div><strong>Circle Calendar <em className="versionBadge">v6.0</em></strong><small>PLAN. SHARE. REMEMBER.</small></div><button className="mobileClose" onClick={() => setMenuOpen(false)}><X/></button></div>
+        <div className="sideLogo"><BrandMark/><div><strong>Circle Calendar <em className="versionBadge">v6.3</em></strong><small>PLAN. SHARE. REMEMBER.</small></div><button className="mobileClose" onClick={() => setMenuOpen(false)}><X/></button></div>
         <label className="groupPicker">GRUP ACTIV<select value={activeGroupId} onChange={event => setActiveGroupId(event.target.value)}>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
       </div>
       <nav className="sidebarScrollArea">
@@ -216,9 +248,9 @@ export function AppShell({ session }: { session: Session }) {
     </aside>
 
     <section className="mainContent">
-      <header className="topbar"><button className="menuToggle" onClick={() => setMenuOpen(true)}><Menu/></button><div><small>{activeGroup?.name}</small><h2>{pageTitle}</h2></div><div className="topActions"><button className="iconButton"><Bell/></button><button className="primary compact" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Eveniment</button></div></header>
+      <header className="topbar"><button className="menuToggle" onClick={() => setMenuOpen(true)}><Menu/></button><div><small>{activeGroup?.name}</small><h2>{pageTitle}</h2></div><div className="topActions"><NotificationCenter userId={session.user.id} onNavigate={openNotification}/><button className="primary compact" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Eveniment</button></div></header>
 
-      {view === "home" && <><div className="page desktopDashboard"><section className="welcome"><div><small>BINE AI REVENIT</small><h1>Salut, {profile?.display_name || profile?.username || "prietene"} 👋</h1><p>Următorul eveniment, albumele recente și grupul tău sunt aici.</p></div><button className="primary" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Creează eveniment</button></section><div className="dashboardGrid"><PendingQuickPlans groups={groups} currentUserId={session.user.id}/><section className="panel"><header><div><small>URMEAZĂ</small><h3>Evenimente viitoare</h3></div><button onClick={() => setView("calendar")}>Vezi calendarul</button></header>{upcoming.length ? upcoming.map(event => <button className="eventListRow" key={event.id} onClick={() => {setSelectedEvent(event);setModalOpen(true);}}><span className="dateBox"><b>{new Date(`${event.event_date}T12:00:00`).getDate()}</b><small>{new Date(`${event.event_date}T12:00:00`).toLocaleDateString("ro-RO",{month:"short"})}</small></span><span><strong>{event.title}</strong><small>{event.event_time?.slice(0,5) || "Fără oră"} · {event.location || "Fără locație"}</small></span></button>) : <div className="emptyState">Nu ai evenimente viitoare.</div>}</section><section className="panel memoryPreview"><header><div><small>ALBUME</small><h3>Media recentă</h3></div><button onClick={() => setView("media")}>Vezi toate</button></header><div className="miniMediaGrid">{allMedia.slice(0,6).map(item => item.mime_type.startsWith("video/") ? <video key={item.id} src={item.signed_url}/> : <img key={item.id} src={item.signed_url} alt=""/> )}</div>{!allMedia.length && <div className="emptyState"><Camera/> Pozele vor apărea aici după ce le adaugi într-un eveniment.</div>}</section></div></div><MobileDashboard profile={profile} groups={groups} activeGroupId={activeGroupId} currentUserId={session.user.id} events={events} vacations={vacations} onEvent={event=>{setSelectedEvent(event);setSelectedDate(event.event_date);setModalOpen(true);}} onCalendar={()=>setView("calendar")} onVacations={()=>setView("vacations")} onRefresh={async()=>{await Promise.all([loadGroups(),loadEvents(),loadVacations()])}}/></>}
+      {view === "home" && <><div className="page desktopDashboard"><section className="welcome"><div><small>BINE AI REVENIT</small><h1>Salut, {profile?.display_name || profile?.username || "prietene"} 👋</h1><p>Următorul eveniment, albumele recente și grupul tău sunt aici.</p></div><button className="primary" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Creează eveniment</button></section><div className="dashboardGrid"><PendingQuickPlans groups={groups} currentUserId={session.user.id}/><section className="panel"><header><div><small>URMEAZĂ</small><h3>Evenimente viitoare</h3></div><button onClick={() => setView("calendar")}>Vezi calendarul</button></header>{upcoming.length ? upcoming.map(event => <button className="eventListRow" key={event.id} onClick={() => {setSelectedEvent(event);setModalOpen(true);}}><span className="dateBox"><b>{new Date(`${event.event_date}T12:00:00`).getDate()}</b><small>{new Date(`${event.event_date}T12:00:00`).toLocaleDateString("ro-RO",{month:"short"})}</small></span><span><strong>{event.title}</strong><small>{event.event_time?.slice(0,5) || "Fără oră"} · {event.location || "Fără locație"}</small></span></button>) : <div className="emptyState brandedEmpty"><img src="/brand/empty/events.svg" alt=""/><span>Nu ai evenimente viitoare.</span></div>}</section><section className="panel memoryPreview"><header><div><small>ALBUME</small><h3>Media recentă</h3></div><button onClick={() => setView("media")}>Vezi toate</button></header><div className="miniMediaGrid">{allMedia.slice(0,6).map(item => item.mime_type.startsWith("video/") ? <video key={item.id} src={item.signed_url}/> : <img key={item.id} src={item.signed_url} alt=""/> )}</div>{!allMedia.length && <div className="emptyState"><Camera/> Pozele vor apărea aici după ce le adaugi într-un eveniment.</div>}</section></div></div><MobileDashboard profile={profile} groups={groups} activeGroupId={activeGroupId} currentUserId={session.user.id} events={events} vacations={vacations} onEvent={event=>{setSelectedEvent(event);setSelectedDate(event.event_date);setModalOpen(true);}} onCalendar={()=>setView("calendar")} onVacations={()=>setView("vacations")} onRefresh={async()=>{await Promise.all([loadGroups(),loadEvents(),loadVacations()])}}/></>}
 
       {view === "calendar" && <CalendarPage month={month} setMonth={setMonth} events={events} vacations={vacations} profiles={calendarProfiles} participantCounts={eventParticipantCounts} onEvent={event => {setSelectedEvent(event);setSelectedDate(event.event_date);setModalOpen(true);}} onVacation={() => setView("vacations")} onCreateDate={date => {setSelectedEvent(null);setSelectedDate(date);setModalOpen(true);}}/>}
       {view === "vacations" && <VacationsPage vacations={vacations} groupId={activeGroupId} userId={session.user.id} memberNames={vacationMemberNames} onChanged={loadVacations}/>}
@@ -227,6 +259,7 @@ export function AppShell({ session }: { session: Session }) {
       {view === "settings" && profile && <SettingsPage profile={profile} email={session.user.email || ""} onSaved={async () => { await loadProfile(); notify("Setările au fost salvate."); }}/>} 
     </section>
 
+    <footer className="appBrandFooter"><BrandMark/><span>Circle Calendar · Plan. Share. Remember.</span></footer>
     <nav className="mobileNav"><button className={view==="home"?"active":""} onClick={()=>setView("home")}><Home/><span>Acasă</span></button><button className={view==="calendar"?"active":""} onClick={()=>setView("calendar")}><CalendarDays/><span>Calendar</span></button><button className="mobilePlus" onClick={()=>setMobileActionsOpen(true)}><Plus/><span>Plan nou</span></button><button className={view==="groups"?"active":""} onClick={()=>setView("groups")}><Users/><span>Grup</span></button><button className={view==="settings"?"active":""} onClick={()=>setView("settings")}><UserCircle/><span>Profil</span></button></nav>
 
     {modalOpen && <EventModal event={selectedEvent} initialDate={selectedDate || isoToday()} groupId={activeGroupId} userId={session.user.id} onClose={() => setModalOpen(false)} onSaved={async () => {await loadEvents();await loadMedia();}} onDeleted={async () => {await loadEvents();await loadMedia();}}/>}
@@ -294,6 +327,17 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
   const [theme, setTheme] = useState(profile.theme || "neon");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notificationPrefs, setNotificationPrefs] = useState<Pick<NotificationPreferences,"groups_enabled"|"events_enabled"|"quick_plans_enabled"|"vacations_enabled"|"reminders_enabled">>({
+    groups_enabled:true,events_enabled:true,quick_plans_enabled:true,vacations_enabled:true,reminders_enabled:true,
+  });
+
+  useEffect(() => {
+    void fetchNotificationPreferences(profile.id).then(values => setNotificationPrefs({
+      groups_enabled:values.groups_enabled,events_enabled:values.events_enabled,
+      quick_plans_enabled:values.quick_plans_enabled,vacations_enabled:values.vacations_enabled,
+      reminders_enabled:values.reminders_enabled,
+    })).catch(() => { /* migration may not be installed yet */ });
+  }, [profile.id]);
 
   useEffect(() => () => {
     if (avatarPreview.startsWith("blob:")) URL.revokeObjectURL(avatarPreview);
@@ -330,6 +374,7 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
         theme
       }).eq("id", profile.id);
       if (updateError) throw updateError;
+      await saveNotificationPreferences(profile.id, notificationPrefs);
       setAvatarUrl(finalAvatarUrl);
       setAvatarFile(null);
       await onSaved();
@@ -365,6 +410,20 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
               {id:"coral",name:"Coral"}, {id:"peach",name:"Peach"}, {id:"berry",name:"Berry"}, {id:"pearl",name:"Pearl"}
             ]).map(option => <button key={option.id} type="button" role="radio" aria-checked={theme===option.id} aria-label={option.name} title={option.name} className={`accentDot ${option.id}${theme===option.id?" active":""}`} onClick={()=>setTheme(option.id)}><span/>{theme===option.id&&<Check/>}</button>)}
           </div>
+        </div>
+      </section>
+
+      <section className="notificationSettingsCard">
+        <div className="sectionHeading"><Bell/><div><small>NOTIFICĂRI</small><h3>Alege ce vrei să urmărești</h3></div></div>
+        <p>Poți schimba oricând categoriile afișate în centrul de notificări.</p>
+        <div className="notificationToggleList">
+          {([
+            ["groups_enabled","Invitații și grupuri","Membri noi și activitatea grupurilor"],
+            ["events_enabled","Evenimente","Evenimente create, modificate sau anulate"],
+            ["quick_plans_enabled","Quick Plan și voturi","Planuri, răspunsuri și comentarii"],
+            ["vacations_enabled","Vacanțe","Perioade noi adăugate de membri"],
+            ["reminders_enabled","Remindere","Evenimente apropiate și planuri fără răspuns"],
+          ] as const).map(([key,title,description])=><label key={key}><span><strong>{title}</strong><small>{description}</small></span><input type="checkbox" checked={notificationPrefs[key]} onChange={event=>setNotificationPrefs(current=>({...current,[key]:event.target.checked}))}/><i/></label>)}
         </div>
       </section>
 

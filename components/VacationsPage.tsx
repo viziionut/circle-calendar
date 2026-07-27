@@ -66,7 +66,7 @@ export function VacationsPage({
         </article>;
       })}
     </div> : <div className="largeEmpty vacationEmpty">
-      <Plane/>
+      <img className="brandEmptyIllustration" src="/brand/empty/vacations.svg" alt=""/>
       <h3>Nicio vacanță planificată</h3>
       <p>Adaugă prima perioadă de vacanță pentru grupul tău.</p>
       <button className="primary" onClick={openCreate}><Plus/> Adaugă vacanță</button>

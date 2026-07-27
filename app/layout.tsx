@@ -1,14 +1,18 @@
 import type { Metadata, Viewport } from "next";
+import "./design-tokens.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Circle Calendar",
-  description: "Plan together. Remember forever.",
+  description: "Plan. Share. Remember.",
   applicationName: "Circle Calendar",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/icon.svg",
-    apple: "/icon.svg",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/brand/icon.svg", type: "image/svg+xml", sizes: "any" },
+    ],
+    apple: "/apple-touch-icon.svg",
   },
   appleWebApp: {
     capable: true,
