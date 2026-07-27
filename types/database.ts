@@ -109,3 +109,54 @@ export type VacationUpdate = {
   end_date?: string;
   notes?: string | null;
 };
+
+export type QuickPlanPreference = "weekend" | "weekdays" | "any";
+export type QuickPlanStatus = "voting" | "completed" | "cancelled";
+export type QuickPlanVoteValue = "yes" | "maybe" | "no";
+
+export type QuickPlan = {
+  id: string;
+  group_id: string;
+  created_by: string;
+  title: string;
+  activity_key: string;
+  activity_emoji: string;
+  search_start: string;
+  search_end: string;
+  duration_days: number;
+  preference: QuickPlanPreference;
+  minimum_participants: number;
+  status: QuickPlanStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type QuickPlanContext = {
+  conflicts: number;
+  countries: Record<string, number>;
+};
+
+export type QuickPlanOption = {
+  id: string;
+  plan_id: string;
+  start_date: string;
+  end_date: string;
+  rank: number;
+  score: number;
+  available_count: number;
+  total_members: number;
+  context: QuickPlanContext;
+  created_at: string;
+};
+
+export type QuickPlanVote = {
+  option_id: string;
+  user_id: string;
+  vote: QuickPlanVoteValue;
+  comment: string | null;
+  updated_at: string;
+};
+
+export type QuickPlanWithDetails = QuickPlan & {
+  options: Array<QuickPlanOption & { votes: QuickPlanVote[] }>;
+};

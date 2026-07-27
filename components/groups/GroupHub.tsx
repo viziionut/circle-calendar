@@ -7,6 +7,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { EventItem, Group, GroupMember, GroupRole, Profile, Vacation } from "@/types/database";
+import { QuickPlanSection } from "@/components/quick-plan/QuickPlan";
 
 type HubMember = GroupMember & { profile: Profile | null };
 
@@ -176,6 +177,14 @@ export function GroupHub({ groupId, currentUserId }: { groupId: string; currentU
           <button onClick={copyInviteCode}><Copy/><span>COD INVITAȚIE</span><strong>{copied ? "COPIAT" : group.invite_code}</strong></button>
         </div>
       </section>
+
+      <QuickPlanSection
+        groupId={groupId}
+        currentUserId={currentUserId}
+        memberIds={members.map(member => member.user_id)}
+        events={events}
+        vacations={vacations}
+      />
 
       <section className="hubSection">
         <header><div><small>ECHIPA</small><h2>Membrii grupului</h2></div><span>{members.length} total</span></header>

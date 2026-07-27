@@ -13,6 +13,7 @@ import type { Brand, EventItem, EventMedia, Group, Profile, Vacation } from "@/t
 import { EventModal } from "./EventModal";
 import { VacationsPage } from "./VacationsPage";
 import { AdminNavItem } from "./admin/AdminNavItem";
+import { PendingQuickPlans } from "./quick-plan/QuickPlan";
 
 type View = "home" | "calendar" | "vacations" | "media" | "groups" | "settings";
 type Dialog = "create" | "join" | "invite" | null;
@@ -155,7 +156,7 @@ export function AppShell({ session }: { session: Session }) {
   if (!groups.length) return <main className={`onboarding ${profile?.brand || "bros"}`}>
     <section className="onboardingCard">
       <span className="onboardingLogo">CC</span>
-      <small>CIRCLE CALENDAR v5.2 LITE</small>
+      <small>CIRCLE CALENDAR v5.5</small>
       <h1>Bun venit, {profile?.display_name || "prietene"}</h1>
       <p>Creează un cerc nou sau intră în grupul prietenilor cu un cod de invitație.</p>
       <div className="onboardingActions">
@@ -173,7 +174,7 @@ export function AppShell({ session }: { session: Session }) {
 
   return <main className={`app ${profile?.brand || "bros"} theme-${profile?.theme || "neon"}`}>
     <aside className={menuOpen ? "sidebar open" : "sidebar"}>
-      <div className="sideLogo"><span>CC</span><div><strong>Circle Calendar <em className="versionBadge">v5.2 Lite</em></strong><small>PLAN. SHARE. REMEMBER.</small></div><button className="mobileClose" onClick={() => setMenuOpen(false)}><X/></button></div>
+      <div className="sideLogo"><span>CC</span><div><strong>Circle Calendar <em className="versionBadge">v5.5</em></strong><small>PLAN. SHARE. REMEMBER.</small></div><button className="mobileClose" onClick={() => setMenuOpen(false)}><X/></button></div>
       <label className="groupPicker">GRUP ACTIV<select value={activeGroupId} onChange={event => setActiveGroupId(event.target.value)}>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
       <nav>
         <button className={view === "home" ? "active" : ""} onClick={() => openView("home")}><Home/>Acasă</button>
@@ -194,7 +195,7 @@ export function AppShell({ session }: { session: Session }) {
     <section className="mainContent">
       <header className="topbar"><button className="menuToggle" onClick={() => setMenuOpen(true)}><Menu/></button><div><small>{activeGroup?.name}</small><h2>{pageTitle}</h2></div><div className="topActions"><button className="iconButton"><Bell/></button><button className="primary compact" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Eveniment</button></div></header>
 
-      {view === "home" && <div className="page"><section className="welcome"><div><small>BINE AI REVENIT</small><h1>Salut, {profile?.display_name || profile?.username || "prietene"} 👋</h1><p>Următorul eveniment, albumele recente și grupul tău sunt aici.</p></div><button className="primary" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Creează eveniment</button></section><div className="dashboardGrid"><section className="panel"><header><div><small>URMEAZĂ</small><h3>Evenimente viitoare</h3></div><button onClick={() => setView("calendar")}>Vezi calendarul</button></header>{upcoming.length ? upcoming.map(event => <button className="eventListRow" key={event.id} onClick={() => {setSelectedEvent(event);setModalOpen(true);}}><span className="dateBox"><b>{new Date(`${event.event_date}T12:00:00`).getDate()}</b><small>{new Date(`${event.event_date}T12:00:00`).toLocaleDateString("ro-RO",{month:"short"})}</small></span><span><strong>{event.title}</strong><small>{event.event_time?.slice(0,5) || "Fără oră"} · {event.location || "Fără locație"}</small></span></button>) : <div className="emptyState">Nu ai evenimente viitoare.</div>}</section><section className="panel memoryPreview"><header><div><small>ALBUME</small><h3>Media recentă</h3></div><button onClick={() => setView("media")}>Vezi toate</button></header><div className="miniMediaGrid">{allMedia.slice(0,6).map(item => item.mime_type.startsWith("video/") ? <video key={item.id} src={item.signed_url}/> : <img key={item.id} src={item.signed_url} alt=""/> )}</div>{!allMedia.length && <div className="emptyState"><Camera/> Pozele vor apărea aici după ce le adaugi într-un eveniment.</div>}</section></div></div>}
+      {view === "home" && <div className="page"><section className="welcome"><div><small>BINE AI REVENIT</small><h1>Salut, {profile?.display_name || profile?.username || "prietene"} 👋</h1><p>Următorul eveniment, albumele recente și grupul tău sunt aici.</p></div><button className="primary" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Creează eveniment</button></section><div className="dashboardGrid"><PendingQuickPlans groups={groups} currentUserId={session.user.id}/><section className="panel"><header><div><small>URMEAZĂ</small><h3>Evenimente viitoare</h3></div><button onClick={() => setView("calendar")}>Vezi calendarul</button></header>{upcoming.length ? upcoming.map(event => <button className="eventListRow" key={event.id} onClick={() => {setSelectedEvent(event);setModalOpen(true);}}><span className="dateBox"><b>{new Date(`${event.event_date}T12:00:00`).getDate()}</b><small>{new Date(`${event.event_date}T12:00:00`).toLocaleDateString("ro-RO",{month:"short"})}</small></span><span><strong>{event.title}</strong><small>{event.event_time?.slice(0,5) || "Fără oră"} · {event.location || "Fără locație"}</small></span></button>) : <div className="emptyState">Nu ai evenimente viitoare.</div>}</section><section className="panel memoryPreview"><header><div><small>ALBUME</small><h3>Media recentă</h3></div><button onClick={() => setView("media")}>Vezi toate</button></header><div className="miniMediaGrid">{allMedia.slice(0,6).map(item => item.mime_type.startsWith("video/") ? <video key={item.id} src={item.signed_url}/> : <img key={item.id} src={item.signed_url} alt=""/> )}</div>{!allMedia.length && <div className="emptyState"><Camera/> Pozele vor apărea aici după ce le adaugi într-un eveniment.</div>}</section></div></div>}
 
       {view === "calendar" && <CalendarPage month={month} setMonth={setMonth} events={events} vacations={vacations} onEvent={event => {setSelectedEvent(event);setSelectedDate(event.event_date);setModalOpen(true);}} onVacation={() => setView("vacations")} onCreateDate={date => {setSelectedEvent(null);setSelectedDate(date);setModalOpen(true);}}/>}
       {view === "vacations" && <VacationsPage vacations={vacations} groupId={activeGroupId} userId={session.user.id} memberNames={vacationMemberNames} onChanged={loadVacations}/>}
