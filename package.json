@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit --incremental false",
+    "test": "node --no-warnings --experimental-strip-types --test tests/*.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.53.0",
@@ -19,6 +21,8 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.22",
     "typescript": "^5.7.0"
   }
 }

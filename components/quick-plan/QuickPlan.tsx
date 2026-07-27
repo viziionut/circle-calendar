@@ -8,6 +8,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { calculateQuickPlanOptions, shiftIsoDate } from "@/lib/quickPlan";
+import { displayPlanStatus, needsUserResponse, responseProgress, validRecommendationOptions } from "@/lib/quickPlanResponses";
 import { useI18n } from "@/lib/i18n";
 import type {
   EventItem, Group, QuickPlanPreference, QuickPlanVoteValue, QuickPlanWithDetails, Vacation,
@@ -47,11 +48,12 @@ function normalizePlans(rows: any[]): QuickPlanWithDetails[] {
 }
 
 export function QuickPlanSection({
-  groupId, currentUserId, memberIds, events, vacations,
+  groupId, currentUserId, memberIds, memberNames = {}, events, vacations,
 }: {
   groupId: string;
   currentUserId: string;
   memberIds: string[];
+  memberNames?: Record<string, string>;
   events: EventItem[];
   vacations: Vacation[];
 }) {
@@ -103,15 +105,16 @@ export function QuickPlanSection({
     </section>
 
     <section className="hubSection quickPlansSection" id="quick-plan">
-      <header><div><small>DECIZII ÎMPREUNĂ</small><h2>Planuri în desfășurare</h2><p>Propuneri, progresul voturilor și recomandarea curentă.</p></div><span className="quickPlanCount">{plans.filter(plan => plan.status === "voting").length} active</span></header>
+      <header><div><small>DECIZII ÎMPREUNĂ</small><h2>Planuri în desfășurare</h2><p>Propuneri, progresul răspunsurilor și recomandarea curentă.</p></div><span className="quickPlanCount">{plans.filter(plan => ["voting","recommended"].includes(plan.status)).length} active</span></header>
       {loading ? <QuickPlanSkeleton/> : error ? <div className="quickPlanError"><CircleHelp/><p>{error}</p></div> : plans.length ? <>
         <div className="quickPlanTabs">{plans.map(plan => {
-          const voters = new Set(plan.options.flatMap(option => option.votes.map(vote => vote.user_id))).size;
+          const progress = responseProgress(plan, memberIds.length);
+          const status = displayPlanStatus(plan);
           return <button key={plan.id} className={plan.id === selectedPlan?.id ? "active" : ""} onClick={() => setSelectedPlanId(plan.id)}>
-            <span>{plan.activity_emoji}</span><div><strong>{plan.title}</strong><small>{voters}/{memberIds.length} au votat</small></div><i>{plan.status === "voting" ? "Votare" : "Finalizat"}</i>
+            <span>{plan.activity_emoji}</span><div><strong>{plan.title}</strong><small>{t("quickPlan.availability.answered", { count: progress.respondedCount, total: memberIds.length })}</small></div><i>{t(`quickPlan.availability.${status === "finalized" ? "finalized" : status === "recommended" ? "recommended" : "voting"}`)}</i>
           </button>;
         })}</div>
-        {selectedPlan && <QuickPlanResults plan={selectedPlan} currentUserId={currentUserId} onChanged={loadPlans}/>}
+        {selectedPlan && <QuickPlanResults plan={selectedPlan} currentUserId={currentUserId} memberIds={memberIds} memberNames={memberNames} onChanged={loadPlans}/>}
       </> : <div className="quickPlanEmpty"><span>✨</span><h3>Niciun plan activ</h3><p>Creează primul Quick Plan și înlocuiește zeci de mesaje cu un vot simplu.</p><button className="secondary" onClick={() => setWizardOpen(true)}><Plus/> Plan nou</button></div>}
     </section>
 
@@ -220,78 +223,142 @@ function QuickPlanWizard({
   </div>;
 }
 
-function QuickPlanResults({ plan, currentUserId, onChanged }: { plan: QuickPlanWithDetails; currentUserId: string; onChanged: () => Promise<void> }) {
+function QuickPlanResults({ plan, currentUserId, memberIds, memberNames, onChanged }: { plan: QuickPlanWithDetails; currentUserId: string; memberIds: string[]; memberNames: Record<string, string>; onChanged: () => Promise<void> }) {
+  const { formatDate, localeTag, t } = useI18n();
+  const ownVotes = useMemo(() => plan.options.flatMap(option => option.votes.filter(vote => vote.user_id === currentUserId)), [currentUserId, plan.options]);
+  const [selections, setSelections] = useState<Record<string, QuickPlanVoteValue>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState(ownVotes.length === 0);
   const [busy, setBusy] = useState("");
+  const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [eventCreated, setEventCreated] = useState(false);
+
+  useEffect(() => {
+    const votes = Object.fromEntries(plan.options.map(option => {
+      const own = option.votes.find(vote => vote.user_id === currentUserId);
+      return [option.id, own?.vote || "no"];
+    })) as Record<string, QuickPlanVoteValue>;
+    setSelections(votes);
+    setComments(Object.fromEntries(plan.options.map(option => {
+      const own = option.votes.find(vote => vote.user_id === currentUserId);
+      return [option.id, own?.comment || ""];
+    })));
+    setEditing(ownVotes.length === 0);
+  }, [currentUserId, ownVotes.length, plan.id, plan.options]);
+
   const ranked = useMemo(() => [...plan.options].sort((left, right) => {
     const voteScore = (option: typeof left) => option.votes.reduce((sum, vote) => sum + (vote.vote === "yes" ? 2 : vote.vote === "maybe" ? 1 : 0), 0);
     return voteScore(right) - voteScore(left) || right.score - left.score;
   }), [plan.options]);
-  const best = ranked[0];
+  const progress = responseProgress(plan, memberIds.length);
+  const validOptions = validRecommendationOptions(plan, memberIds);
+  const validOptionIds = new Set(validOptions.map(option => option.id));
+  const everyoneResponded = memberIds.length > 0 && progress.respondedCount === new Set(memberIds).size;
+  const noSuitableDate = everyoneResponded && validOptions.length === 0;
+  const best = displayPlanStatus(plan) === "recommended"
+    ? ranked.find(option => validOptionIds.has(option.id)) || ranked[0]
+    : ranked[0];
+  const missingNames = memberIds.filter(id => !progress.respondedIds.includes(id)).map(id => memberNames[id] || "Membru");
+  const lastUpdated = ownVotes.reduce((latest, vote) => vote.updated_at > latest ? vote.updated_at : latest, "");
+  const finalized = displayPlanStatus(plan) === "finalized";
   if (!best) return null;
 
-  async function vote(optionId: string, value: QuickPlanVoteValue) {
-    setBusy(optionId);
-    await supabase.from("quick_plan_votes").upsert({
-      option_id: optionId, user_id: currentUserId, vote: value,
-      comment: comments[optionId]?.trim() || null, updated_at: new Date().toISOString(),
-    }, { onConflict: "option_id,user_id" });
-    setBusy("");
-    await onChanged();
-  }
-
-  async function createEvent() {
-    setBusy("event");
-    const { error } = await supabase.from("events").insert({
-      group_id: plan.group_id, created_by: currentUserId, title: `${plan.activity_emoji} ${plan.title}`,
-      event_date: best.start_date, location: "", details: `Creat din Quick Plan. Perioadă recomandată: ${formatPeriod(best.start_date, best.end_date)}.`,
-      theme: "cyan", is_pinned: true,
-    });
-    if (!error) {
-      await supabase.from("quick_plans").update({ status: "completed", updated_at: new Date().toISOString() }).eq("id", plan.id);
-      setEventCreated(true);
+  async function saveAvailability() {
+    if (busy || finalized) return;
+    setBusy("availability");
+    setFeedback(null);
+    const now = new Date().toISOString();
+    const rows = plan.options.map(option => ({
+      option_id: option.id,
+      user_id: currentUserId,
+      vote: selections[option.id] || "no",
+      comment: comments[option.id]?.trim() || null,
+      updated_at: now,
+    }));
+    const { error } = await supabase.from("quick_plan_votes").upsert(rows, { onConflict: "option_id,user_id" });
+    if (error) {
+      setFeedback({ kind: "error", text: t("quickPlan.availability.saveError", { message: error.message }) });
+    } else {
       await onChanged();
+      setEditing(false);
+      setFeedback({ kind: "success", text: t("quickPlan.availability.saveSuccess") });
     }
     setBusy("");
   }
 
+  async function createEvent() {
+    setBusy("event");
+    setFeedback(null);
+    const { error } = await supabase.from("events").insert({
+      group_id: plan.group_id, created_by: currentUserId, title: `${plan.activity_emoji} ${plan.title}`,
+      event_date: best.start_date, location: "", details: `Creat din Quick Plan. Perioadă recomandată: ${formatPeriod(best.start_date, best.end_date, localeTag)}.`,
+      theme: "cyan", is_pinned: true,
+    });
+    if (!error) {
+      const { error: statusError } = await supabase.from("quick_plans").update({ status: "finalized", updated_at: new Date().toISOString() }).eq("id", plan.id);
+      if (!statusError) {
+        setEventCreated(true);
+        await onChanged();
+      } else setFeedback({ kind: "error", text: statusError.message });
+    } else setFeedback({ kind: "error", text: error.message });
+    setBusy("");
+  }
+
   return <div className="quickPlanResults">
-    <article className="quickRecommendation">
+    {noSuitableDate ? <article className="quickRecommendation noSuitableRecommendation">
+      <div className="recommendationGlow"/>
+      <header><span><CircleHelp/> {t("quickPlan.availability.result")}</span><i>{t("quickPlan.availability.voteComplete")}</i></header>
+      <div className="noSuitableBody"><CircleHelp/><div><h2>{t("quickPlan.availability.noSuitableTitle")}</h2><p>{t("quickPlan.availability.noSuitableText")}</p></div></div>
+    </article> : <article className="quickRecommendation">
       <div className="recommendationGlow"/>
       <header><span><Flame/> RECOMANDAREA CIRCLE CALENDAR</span><i>Cea mai bună variantă</i></header>
-      <div className="recommendationMain"><div><small>{plan.activity_emoji} {plan.title.toUpperCase()}</small><h2>{formatPeriod(best.start_date, best.end_date)}</h2><div className="stars">{"★".repeat(Math.max(1, Math.round(best.score / 20)))}<span>{"★".repeat(5 - Math.max(1, Math.round(best.score / 20)))}</span></div></div><div className="scoreRing" style={{ "--score": `${best.score * 3.6}deg` } as React.CSSProperties}><strong>{best.score}%</strong><span>scor</span></div></div>
-      <div className="recommendationMeta"><span><Users/><strong>{best.available_count} din {best.total_members}</strong> disponibili</span><span><MessageCircle/><strong>{best.total_members - new Set(best.votes.map(vote => vote.user_id)).size}</strong> fără răspuns</span>{Object.entries(best.context?.countries || {}).slice(0,2).map(([country,count]) => <span key={country}>📍 <strong>{count}</strong> în {country}</span>)}</div>
-      <button className="primary" disabled={busy === "event" || eventCreated || plan.status === "completed"} onClick={() => void createEvent()}><CalendarCheck/> {eventCreated || plan.status === "completed" ? "Eveniment creat" : "Creează eveniment"}</button>
-    </article>
-    <div className="quickOptionList">{ranked.map((option, index) => {
-      const ownVote = option.votes.find(vote => vote.user_id === currentUserId);
-      const voters = new Set(option.votes.map(vote => vote.user_id)).size;
-      return <article className={`quickOptionCard ${index === 0 ? "best" : ""}`} key={option.id}>
-        <header><div><span className="optionRank">#{index + 1}</span><div><h3>{formatPeriod(option.start_date, option.end_date)}</h3><span className="optionStars">{"★".repeat(Math.max(1, Math.round(option.score / 20)))}</span></div></div><strong>{option.score}%</strong></header>
-        <div className="optionAvailability"><span>{option.available_count} din {option.total_members} disponibili</span><div><i style={{ width: `${(voters / Math.max(1, option.total_members)) * 100}%` }}/></div><small>{voters}/{option.total_members} voturi</small></div>
-        <div className="voteButtons"><button className={ownVote?.vote === "yes" ? "active yes" : ""} disabled={busy === option.id} onClick={() => void vote(option.id,"yes")}><ThumbsUp/> Da</button><button className={ownVote?.vote === "maybe" ? "active maybe" : ""} disabled={busy === option.id} onClick={() => void vote(option.id,"maybe")}><CircleHelp/> Poate</button><button className={ownVote?.vote === "no" ? "active no" : ""} disabled={busy === option.id} onClick={() => void vote(option.id,"no")}><ThumbsDown/> Nu</button></div>
-        <label className="voteComment"><MessageCircle/><input value={comments[option.id] ?? ownVote?.comment ?? ""} onChange={event => setComments(current => ({ ...current, [option.id]: event.target.value }))} placeholder="Adaugă un comentariu..."/></label>
-      </article>;
-    })}</div>
+      <div className="recommendationMain"><div><small>{plan.activity_emoji} {plan.title.toUpperCase()}</small><h2>{formatPeriod(best.start_date, best.end_date, localeTag)}</h2><div className="stars">{"★".repeat(Math.max(1, Math.round(best.score / 20)))}<span>{"★".repeat(5 - Math.max(1, Math.round(best.score / 20)))}</span></div></div><div className="scoreRing" style={{ "--score": `${best.score * 3.6}deg` } as React.CSSProperties}><strong>{best.score}%</strong><span>scor</span></div></div>
+      <div className="recommendationMeta"><span><Users/><strong>{t("quickPlan.availability.answered", { count: progress.respondedCount, total: memberIds.length })}</strong></span><span><MessageCircle/><strong>{t("quickPlan.availability.missing", { count: progress.missingCount })}</strong></span>{Object.entries(best.context?.countries || {}).slice(0,2).map(([country,count]) => <span key={country}>📍 <strong>{count}</strong> în {country}</span>)}</div>
+      {missingNames.length > 0 && <p className="missingRespondents">{t("quickPlan.availability.missingNames", { names: missingNames.join(", ") })}</p>}
+      {currentUserId === plan.created_by && displayPlanStatus(plan) === "recommended" && <button className="primary" disabled={busy === "event" || eventCreated || finalized} onClick={() => void createEvent()}><CalendarCheck/> {eventCreated || finalized ? "Eveniment creat" : t("quickPlan.availability.confirm")}</button>}
+    </article>}
+
+    <section className="availabilityEditor">
+      <header><div><small>{t("quickPlan.availability.yourAnswer")}</small><h3>{t("quickPlan.availability.title")}</h3>{ownVotes.length > 0 && <span className="availabilitySaved"><Check/> {t("quickPlan.availability.saved")}{lastUpdated ? ` · ${t("quickPlan.availability.lastChanged", { date: formatDate(lastUpdated, { dateStyle: "medium", timeStyle: "short" }) })}` : ""}</span>}</div>{ownVotes.length > 0 && !editing && !finalized && <button className="secondary" onClick={() => { setEditing(true); setFeedback(null); }}>{t("quickPlan.availability.edit")}</button>}</header>
+      <div className="quickOptionList">{ranked.map((option, index) => {
+        const selected = selections[option.id] || "no";
+        const voters = new Set(option.votes.map(vote => vote.user_id)).size;
+        return <article className={`quickOptionCard ${index === 0 ? "best" : ""}`} key={option.id}>
+          <header><div><span className="optionRank">#{index + 1}</span><div><h3>{formatPeriod(option.start_date, option.end_date, localeTag)}</h3><span className="optionStars">{"★".repeat(Math.max(1, Math.round(option.score / 20)))}</span></div></div><strong>{option.score}%</strong></header>
+          <div className="optionAvailability"><span>{option.available_count} din {option.total_members} disponibili</span><div><i style={{ width: `${(voters / Math.max(1, option.total_members)) * 100}%` }}/></div><small>{voters} răspunsuri</small></div>
+          <div className="voteButtons"><button className={selected === "yes" ? "active yes" : ""} disabled={!editing || Boolean(busy)} onClick={() => setSelections(current => ({ ...current, [option.id]: "yes" }))}><ThumbsUp/> {t("quickPlan.availability.available")}</button><button className={selected === "maybe" ? "active maybe" : ""} disabled={!editing || Boolean(busy)} onClick={() => setSelections(current => ({ ...current, [option.id]: "maybe" }))}><CircleHelp/> {t("quickPlan.availability.maybe")}</button><button className={selected === "no" ? "active no" : ""} disabled={!editing || Boolean(busy)} onClick={() => setSelections(current => ({ ...current, [option.id]: "no" }))}><ThumbsDown/> {t("quickPlan.availability.unavailable")}</button></div>
+          <label className="voteComment"><MessageCircle/><input disabled={!editing || Boolean(busy)} value={comments[option.id] || ""} onChange={event => setComments(current => ({ ...current, [option.id]: event.target.value }))} placeholder={t("quickPlan.availability.comment")}/></label>
+        </article>;
+      })}</div>
+      {feedback && <p className={`availabilityFeedback ${feedback.kind}`} role="status">{feedback.kind === "success" && <Check/>}{feedback.text}</p>}
+      {editing && !finalized && <button className="primary saveAvailabilityButton" disabled={Boolean(busy)} onClick={() => void saveAvailability()}>{busy === "availability" ? <Loader2 className="spin"/> : <Check/>} {busy === "availability" ? t("quickPlan.availability.saving") : t("quickPlan.availability.save")}</button>}
+    </section>
   </div>;
 }
 
 export function PendingQuickPlans({ groups, currentUserId }: { groups: Group[]; currentUserId: string }) {
+  const { t } = useI18n();
   const [plans, setPlans] = useState<QuickPlanWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const groupIds = useMemo(() => groups.map(group => group.id), [groups]);
   const load = useCallback(async () => {
     if (!groupIds.length) { setPlans([]); setLoading(false); return; }
-    const { data } = await supabase.from("quick_plans").select("*,quick_plan_options(*,quick_plan_votes(*))").in("group_id", groupIds).eq("status", "voting").order("created_at", { ascending: false });
-    const normalized = normalizePlans(data || []).filter(plan => !plan.options.some(option => option.votes.some(vote => vote.user_id === currentUserId)));
-    setPlans(normalized); setLoading(false);
+    const { data, error: queryError } = await supabase.from("quick_plans").select("*,quick_plan_options(*,quick_plan_votes(*))").in("group_id", groupIds).in("status", ["voting","recommended"]).order("created_at", { ascending: false });
+    if (queryError) {
+      setError(queryError.message);
+      setPlans([]);
+    } else {
+      setPlans(normalizePlans(data || []).filter(plan => needsUserResponse(plan, currentUserId)));
+      setError("");
+    }
+    setLoading(false);
   }, [currentUserId, groupIds]);
   useEffect(() => { void load(); }, [load]);
   const groupById = new Map(groups.map(group => [group.id, group]));
   return <section className="panel pendingPlans">
     <header><div><small>ACȚIUNE NECESARĂ</small><h3>Necesită răspuns</h3></div>{plans.length > 0 && <span className="pendingBadge">{plans.length}</span>}</header>
-    {loading ? <div className="pendingSkeleton"><i/><i/></div> : plans.length ? <div className="pendingPlanList">{plans.map(plan => <a href={`/groups/${plan.group_id}`} key={plan.id}><span>{plan.activity_emoji}</span><div><strong>{plan.title}</strong><small>{groupById.get(plan.group_id)?.name} · {plan.options.length} variante</small></div><ChevronRight/></a>)}</div> : <div className="pendingEmpty"><Check/><div><strong>Ești la zi</strong><small>Nu există planuri care așteaptă votul tău.</small></div></div>}
+    {loading ? <div className="pendingSkeleton"><i/><i/></div> : error ? <div className="pendingLoadError"><CircleHelp/><span>{t("quickPlan.availability.checkFailed")}</span></div> : plans.length ? <div className="pendingPlanList">{plans.map(plan => <a href={`/groups/${plan.group_id}?plan=${plan.id}#quick-plan`} key={plan.id}><span>{plan.activity_emoji}</span><div><strong>{plan.title}</strong><small>{groupById.get(plan.group_id)?.name} · {t("quickPlan.availability.setAvailability")}</small></div><b>{t("quickPlan.availability.respond")}</b><ChevronRight/></a>)}</div> : <div className="pendingEmpty"><Check/><div><strong>Ești la zi</strong><small>Nu există planuri care așteaptă votul tău.</small></div></div>}
   </section>;
 }
 

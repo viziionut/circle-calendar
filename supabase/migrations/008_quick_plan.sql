@@ -12,7 +12,7 @@ create table if not exists public.quick_plans (
   duration_days integer not null check (duration_days between 1 and 31),
   preference text not null default 'any' check (preference in ('weekend','weekdays','any')),
   minimum_participants integer not null check (minimum_participants >= 2),
-  status text not null default 'voting' check (status in ('voting','completed','cancelled')),
+  status text not null default 'voting' check (status in ('draft','voting','recommended','finalized','completed','cancelled')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (search_end >= search_start)
@@ -40,6 +40,7 @@ create table if not exists public.quick_plan_votes (
   user_id uuid not null references public.profiles(id) on delete cascade,
   vote text not null check (vote in ('yes','maybe','no')),
   comment text,
+  created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (option_id, user_id)
 );
@@ -71,7 +72,10 @@ drop policy if exists "creators and group managers update quick plans" on public
 create policy "creators and group managers update quick plans"
 on public.quick_plans for update to authenticated
 using (created_by = auth.uid() or public.has_group_role(group_id, array['owner','admin']))
-with check (created_by = auth.uid() or public.has_group_role(group_id, array['owner','admin']));
+with check (
+  (created_by = auth.uid() or public.has_group_role(group_id, array['owner','admin']))
+  and (status <> 'finalized' or created_by = auth.uid())
+);
 
 drop policy if exists "creators and group managers delete quick plans" on public.quick_plans;
 create policy "creators and group managers delete quick plans"
@@ -142,7 +146,7 @@ with check (
     from public.quick_plan_options qpo
     join public.quick_plans qp on qp.id = qpo.plan_id
     where qpo.id = quick_plan_votes.option_id
-      and qp.status = 'voting'
+      and qp.status in ('voting','recommended')
       and public.is_group_member(qp.group_id)
   )
 );
@@ -157,7 +161,7 @@ using (
     from public.quick_plan_options qpo
     join public.quick_plans qp on qp.id = qpo.plan_id
     where qpo.id = quick_plan_votes.option_id
-      and qp.status = 'voting'
+      and qp.status in ('voting','recommended')
       and public.is_group_member(qp.group_id)
   )
 )
@@ -168,7 +172,7 @@ with check (
     from public.quick_plan_options qpo
     join public.quick_plans qp on qp.id = qpo.plan_id
     where qpo.id = quick_plan_votes.option_id
-      and qp.status = 'voting'
+      and qp.status in ('voting','recommended')
       and public.is_group_member(qp.group_id)
   )
 );

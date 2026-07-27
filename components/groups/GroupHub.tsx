@@ -183,6 +183,7 @@ export function GroupHub({ groupId, currentUserId }: { groupId: string; currentU
         groupId={groupId}
         currentUserId={currentUserId}
         memberIds={members.map(member => member.user_id)}
+        memberNames={Object.fromEntries(members.map(member => [member.user_id, displayName(member.profile)]))}
         events={events}
         vacations={vacations}
       />

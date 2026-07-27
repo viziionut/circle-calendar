@@ -113,7 +113,7 @@ export type VacationUpdate = {
 };
 
 export type QuickPlanPreference = "weekend" | "weekdays" | "any";
-export type QuickPlanStatus = "voting" | "completed" | "cancelled";
+export type QuickPlanStatus = "draft" | "voting" | "recommended" | "finalized" | "completed" | "cancelled";
 export type QuickPlanVoteValue = "yes" | "maybe" | "no";
 
 export type QuickPlan = {
@@ -156,6 +156,7 @@ export type QuickPlanVote = {
   user_id: string;
   vote: QuickPlanVoteValue;
   comment: string | null;
+  created_at?: string;
   updated_at: string;
 };
 

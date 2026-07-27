@@ -254,7 +254,7 @@ begin
   if tg_op='INSERT' then
     ntype:='quick_plan_vote_requested'; ntitle:=actor_name||' a creat un Quick Plan';
     nmessage:='Votează variantele pentru '||new.activity_emoji||' '||new.title;
-  elsif old.status is distinct from new.status and new.status='completed' then
+  elsif old.status is distinct from new.status and new.status in ('completed','finalized') then
     ntype:='quick_plan_confirmed'; ntitle:='Quick Plan confirmat';
     nmessage:=new.activity_emoji||' '||new.title||' are o variantă finală.';
   else return new;
@@ -329,7 +329,7 @@ begin
   for item in
     select qp.id,qp.group_id,qp.title,qp.activity_emoji,gm.user_id from public.quick_plans qp
     join public.group_members gm on gm.group_id=qp.group_id
-    where qp.status='voting' and not exists (
+    where qp.status in ('voting','recommended') and not exists (
       select 1 from public.quick_plan_votes qpv join public.quick_plan_options qpo on qpo.id=qpv.option_id
       where qpo.plan_id=qp.id and qpv.user_id=gm.user_id
     )
