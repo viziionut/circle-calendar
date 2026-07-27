@@ -16,7 +16,7 @@
     "friend": "prietene",
     "noLocation": "Fără locație",
     "allDay": "Toată ziua",
-    "days": "{count, plural, one {zi} other {zile}}",
+    "days": "{count} {count, plural, one {zi} other {zile}}",
     "participants": "{count, plural, one {participant} other {participanți}}"
   },
   "language": {

@@ -16,7 +16,7 @@
     "friend": "friend",
     "noLocation": "No location",
     "allDay": "All day",
-    "days": "{count, plural, one {day} other {days}}",
+    "days": "{count} {count, plural, one {day} other {days}}",
     "participants": "{count, plural, one {participant} other {participants}}"
   },
   "language": {
