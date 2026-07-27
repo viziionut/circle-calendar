@@ -30,6 +30,8 @@ export function AppShell({ session }: { session: Session }) {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [vacations, setVacations] = useState<Vacation[]>([]);
   const [vacationMemberNames, setVacationMemberNames] = useState<Record<string, string>>({});
+  const [calendarProfiles, setCalendarProfiles] = useState<Record<string, Profile>>({});
+  const [eventParticipantCounts, setEventParticipantCounts] = useState<Record<string, number>>({});
   const [allMedia, setAllMedia] = useState<EventMedia[]>([]);
   const [view, setView] = useState<View>("home");
   const [month, setMonth] = useState(new Date());
@@ -64,7 +66,21 @@ export function AppShell({ session }: { session: Session }) {
     if (!activeGroupId) { setEvents([]); return; }
     const { data, error } = await supabase.from("events").select("*").eq("group_id", activeGroupId).order("event_date");
     if (error) console.error(error);
-    setEvents((data || []) as EventItem[]);
+    const rows = (data || []) as EventItem[];
+    setEvents(rows);
+    const eventIds = rows.map(event => event.id);
+    const creatorIds = [...new Set(rows.map(event => event.created_by))];
+    const [rsvpsResult, profilesResult] = await Promise.all([
+      eventIds.length ? supabase.from("event_rsvps").select("event_id,user_id,status").in("event_id", eventIds).eq("status", "yes") : Promise.resolve({ data: [], error: null }),
+      creatorIds.length ? supabase.from("profiles").select("*").in("id", creatorIds) : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (rsvpsResult.error) console.error(rsvpsResult.error);
+    if (profilesResult.error) console.error(profilesResult.error);
+    setEventParticipantCounts(Object.fromEntries(eventIds.map(eventId => [
+      eventId,
+      Math.max(1, new Set((rsvpsResult.data || []).filter(rsvp => rsvp.event_id === eventId).map(rsvp => rsvp.user_id)).size),
+    ])));
+    setCalendarProfiles(current => ({ ...current, ...Object.fromEntries(((profilesResult.data || []) as Profile[]).map(item => [item.id, item])) }));
   }, [activeGroupId]);
 
   const loadMedia = useCallback(async () => {
@@ -106,6 +122,7 @@ export function AppShell({ session }: { session: Session }) {
       row.id,
       row.display_name || row.username || "Membru al grupului",
     ])));
+    setCalendarProfiles(current => ({ ...current, ...Object.fromEntries(((profileRows || []) as Profile[]).map(item => [item.id, item])) }));
   }, [activeGroupId]);
 
   useEffect(() => { void Promise.all([loadProfile(), loadGroups()]).finally(() => setLoading(false)); }, [loadProfile, loadGroups]);
@@ -174,9 +191,11 @@ export function AppShell({ session }: { session: Session }) {
 
   return <main className={`app ${profile?.brand || "bros"} theme-${profile?.theme || "neon"}`}>
     <aside className={menuOpen ? "sidebar open" : "sidebar"}>
-      <div className="sideLogo"><span>CC</span><div><strong>Circle Calendar <em className="versionBadge">v5.5</em></strong><small>PLAN. SHARE. REMEMBER.</small></div><button className="mobileClose" onClick={() => setMenuOpen(false)}><X/></button></div>
-      <label className="groupPicker">GRUP ACTIV<select value={activeGroupId} onChange={event => setActiveGroupId(event.target.value)}>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
-      <nav>
+      <div className="sidebarFixedTop">
+        <div className="sideLogo"><span>CC</span><div><strong>Circle Calendar <em className="versionBadge">v5.5.1</em></strong><small>PLAN. SHARE. REMEMBER.</small></div><button className="mobileClose" onClick={() => setMenuOpen(false)}><X/></button></div>
+        <label className="groupPicker">GRUP ACTIV<select value={activeGroupId} onChange={event => setActiveGroupId(event.target.value)}>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
+      </div>
+      <nav className="sidebarScrollArea">
         <button className={view === "home" ? "active" : ""} onClick={() => openView("home")}><Home/>Acasă</button>
         <button className={view === "calendar" ? "active" : ""} onClick={() => openView("calendar")}><CalendarDays/>Calendar</button>
         <button className={view === "vacations" ? "active" : ""} onClick={() => openView("vacations")}><Plane/>Vacanțe</button>
@@ -187,9 +206,11 @@ export function AppShell({ session }: { session: Session }) {
         <button onClick={() => { setDialog("invite"); setMenuOpen(false); }}><Send/>Invită membri</button>
         <button className={view === "settings" ? "active" : ""} onClick={() => openView("settings")}><Settings/>Setări cont</button>
         <AdminNavItem onNavigate={() => setMenuOpen(false)}/>
+        <button className="logout" onClick={() => supabase.auth.signOut()}><LogOut/> Log out</button>
       </nav>
-      <button className="inviteBox" onClick={() => setDialog("invite")}><small>COD INVITAȚIE</small><strong>{activeGroup?.invite_code}</strong><span><Share2/> Invită</span></button>
-      <button className="logout" onClick={() => supabase.auth.signOut()}><LogOut/> Log out</button>
+      <div className="sidebarFixedBottom">
+        <button className="inviteBox" onClick={() => setDialog("invite")}><small>COD INVITAȚIE</small><strong>{activeGroup?.invite_code}</strong><span><Share2/> Invită</span></button>
+      </div>
     </aside>
 
     <section className="mainContent">
@@ -197,7 +218,7 @@ export function AppShell({ session }: { session: Session }) {
 
       {view === "home" && <div className="page"><section className="welcome"><div><small>BINE AI REVENIT</small><h1>Salut, {profile?.display_name || profile?.username || "prietene"} 👋</h1><p>Următorul eveniment, albumele recente și grupul tău sunt aici.</p></div><button className="primary" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Creează eveniment</button></section><div className="dashboardGrid"><PendingQuickPlans groups={groups} currentUserId={session.user.id}/><section className="panel"><header><div><small>URMEAZĂ</small><h3>Evenimente viitoare</h3></div><button onClick={() => setView("calendar")}>Vezi calendarul</button></header>{upcoming.length ? upcoming.map(event => <button className="eventListRow" key={event.id} onClick={() => {setSelectedEvent(event);setModalOpen(true);}}><span className="dateBox"><b>{new Date(`${event.event_date}T12:00:00`).getDate()}</b><small>{new Date(`${event.event_date}T12:00:00`).toLocaleDateString("ro-RO",{month:"short"})}</small></span><span><strong>{event.title}</strong><small>{event.event_time?.slice(0,5) || "Fără oră"} · {event.location || "Fără locație"}</small></span></button>) : <div className="emptyState">Nu ai evenimente viitoare.</div>}</section><section className="panel memoryPreview"><header><div><small>ALBUME</small><h3>Media recentă</h3></div><button onClick={() => setView("media")}>Vezi toate</button></header><div className="miniMediaGrid">{allMedia.slice(0,6).map(item => item.mime_type.startsWith("video/") ? <video key={item.id} src={item.signed_url}/> : <img key={item.id} src={item.signed_url} alt=""/> )}</div>{!allMedia.length && <div className="emptyState"><Camera/> Pozele vor apărea aici după ce le adaugi într-un eveniment.</div>}</section></div></div>}
 
-      {view === "calendar" && <CalendarPage month={month} setMonth={setMonth} events={events} vacations={vacations} onEvent={event => {setSelectedEvent(event);setSelectedDate(event.event_date);setModalOpen(true);}} onVacation={() => setView("vacations")} onCreateDate={date => {setSelectedEvent(null);setSelectedDate(date);setModalOpen(true);}}/>}
+      {view === "calendar" && <CalendarPage month={month} setMonth={setMonth} events={events} vacations={vacations} profiles={calendarProfiles} participantCounts={eventParticipantCounts} onEvent={event => {setSelectedEvent(event);setSelectedDate(event.event_date);setModalOpen(true);}} onVacation={() => setView("vacations")} onCreateDate={date => {setSelectedEvent(null);setSelectedDate(date);setModalOpen(true);}}/>}
       {view === "vacations" && <VacationsPage vacations={vacations} groupId={activeGroupId} userId={session.user.id} memberNames={vacationMemberNames} onChanged={loadVacations}/>}
       {view === "media" && <div className="page"><section className="pageTitle"><small>CIRCLE MEMORIES</small><h1>Arhiva evenimentelor</h1><p>Fiecare album este creat automat din media încărcată în evenimente.</p></section><div className="albumCards">{events.filter(event => allMedia.some(media => media.event_id === event.id)).map(event => {const items=allMedia.filter(media => media.event_id===event.id);return <button key={event.id} className="albumCard" onClick={() => {setSelectedEvent(event);setModalOpen(true);}}><div className="albumCover">{items[0]?.mime_type.startsWith("video/") ? <video src={items[0]?.signed_url}/> : <img src={items[0]?.signed_url} alt=""/>}<span>{items.length}</span></div><div><strong>{event.title}</strong><small>{formatDate(event.event_date)} · {items.filter(item=>item.mime_type.startsWith("image/")).length} poze · {items.filter(item=>item.mime_type.startsWith("video/")).length} video</small></div></button>})}</div>{!allMedia.length && <div className="largeEmpty"><Images/><h3>Arhiva este goală</h3><p>Deschide un eveniment și adaugă poze sau videoclipuri.</p></div>}</div>}
       {view === "groups" && <GroupsPage groups={groups} activeGroupId={activeGroupId} onSelect={setActiveGroupId} onCreate={() => setDialog("create")} onJoin={() => setDialog("join")} onInvite={(groupId) => { setActiveGroupId(groupId); setDialog("invite"); }}/>} 
@@ -332,7 +353,7 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
   </div>;
 }
 
-function CalendarPage({month,setMonth,events,vacations,onEvent,onVacation,onCreateDate}:{month:Date;setMonth:(date:Date)=>void;events:EventItem[];vacations:Vacation[];onEvent:(event:EventItem)=>void;onVacation:(vacation:Vacation)=>void;onCreateDate:(date:string)=>void}) {
+function CalendarPage({month,setMonth,events,vacations,profiles,participantCounts,onEvent,onVacation,onCreateDate}:{month:Date;setMonth:(date:Date)=>void;events:EventItem[];vacations:Vacation[];profiles:Record<string,Profile>;participantCounts:Record<string,number>;onEvent:(event:EventItem)=>void;onVacation:(vacation:Vacation)=>void;onCreateDate:(date:string)=>void}) {
   const [compact, setCompact] = useState(false);
   useEffect(() => {
     const saved = window.localStorage.getItem("circle-calendar-compact");
@@ -344,5 +365,43 @@ function CalendarPage({month,setMonth,events,vacations,onEvent,onVacation,onCrea
   const days=new Date(year,currentMonth+1,0).getDate();
   const cells=Array.from({length:42},(_,index)=>{const day=index-firstDay+1;return day>=1&&day<=days?day:null});
   const today=isoToday();
-  return <div className="page"><section className={`calendarPanel ${compact?"compactCalendar":"largeCalendar"}`}><header className="calendarHeader"><div><small>CALENDAR</small><h1>{monthTitle(month)}</h1></div><div><button className="calendarSizeButton" onClick={toggleCompact} title={compact?"Mărește calendarul":"Micșorează calendarul"}>{compact?<Maximize2/>:<Minimize2/>}<span>{compact?"Mare":"Compact"}</span></button><button className="iconButton" onClick={()=>setMonth(new Date(year,currentMonth-1,1))}><ChevronLeft/></button><button onClick={()=>setMonth(new Date())}>Astăzi</button><button className="iconButton" onClick={()=>setMonth(new Date(year,currentMonth+1,1))}><ChevronRight/></button></div></header><p className="calendarHint">Apasă pe o zi liberă pentru a crea rapid un eveniment. Vacanțele sunt afișate cu mov.</p><div className="calendarViewport"><div className="weekDays">{["L","Ma","Mi","J","V","S","D"].map(day=><span key={day}>{day}</span>)}</div><div className="calendarGrid">{cells.map((day,index)=>{const date=day?`${year}-${String(currentMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`:"";const dayEvents=events.filter(event=>event.event_date===date);const dayVacations=vacations.filter(vacation=>vacation.start_date<=date&&vacation.end_date>=date);return <div key={index} className={`${!day?"day muted":"day"}${date===today?" todayGlow":""}`} onClick={()=>day&&onCreateDate(date)} role={day?"button":undefined} tabIndex={day?0:undefined} onKeyDown={event=>{if(day&&(event.key==="Enter"||event.key===" "))onCreateDate(date)}}><b>{day}</b>{dayEvents.map(event=><button key={event.id} onClick={click=>{click.stopPropagation();onEvent(event)}} title={event.title}><strong>{event.title}</strong><small>{event.event_time?.slice(0,5)}</small></button>)}{dayVacations.map(vacation=><button className="calendarVacation" key={vacation.id} onClick={click=>{click.stopPropagation();onVacation(vacation)}} title={`Vacanță: ${vacation.country}`}><strong><Plane/> {vacation.country}</strong><small>Vacanță</small></button>)}</div>})}</div></div></section></div>;
+  return <div className="page"><section className={`calendarPanel ${compact?"compactCalendar":"largeCalendar"}`}><header className="calendarHeader"><div><small>CALENDAR</small><h1>{monthTitle(month)}</h1></div><div><button className="calendarSizeButton" onClick={toggleCompact} title={compact?"Mărește calendarul":"Micșorează calendarul"}>{compact?<Maximize2/>:<Minimize2/>}<span>{compact?"Mare":"Compact"}</span></button><button className="iconButton" onClick={()=>setMonth(new Date(year,currentMonth-1,1))}><ChevronLeft/></button><button onClick={()=>setMonth(new Date())}>Astăzi</button><button className="iconButton" onClick={()=>setMonth(new Date(year,currentMonth+1,1))}><ChevronRight/></button></div></header><p className="calendarHint">Apasă pe o zi liberă pentru a crea rapid un eveniment. Vacanțele sunt afișate cu mov.</p><div className="calendarViewport"><div className="weekDays">{["L","Ma","Mi","J","V","S","D"].map(day=><span key={day}>{day}</span>)}</div><div className="calendarGrid">{cells.map((day,index)=>{
+    const date=day?`${year}-${String(currentMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`:"";
+    const dayEvents=events.filter(event=>event.event_date===date);
+    const dayVacations=vacations.filter(vacation=>vacation.start_date<=date&&vacation.end_date>=date);
+    return <div key={index} className={`${!day?"day muted":"day"}${date===today?" todayGlow":""}`} onClick={()=>day&&onCreateDate(date)} role={day?"button":undefined} tabIndex={day?0:undefined} onKeyDown={event=>{if(day&&(event.key==="Enter"||event.key===" "))onCreateDate(date)}}>
+      <b>{day}</b>
+      {dayEvents.map(event=>{const owner=profiles[event.created_by];return <button className="smartCalendarCard eventCalendarCard" key={event.id} onClick={click=>{click.stopPropagation();onEvent(event)}}>
+        <CalendarAvatar profile={owner}/>
+        <span className="calendarCardText"><strong>{event.title}</strong><small>{profileName(owner)}</small></span>
+        <span className="calendarCompactIcon">●</span>
+        <CalendarTooltip type="event" title={event.title} profile={owner} location={event.location} participantCount={participantCounts[event.id]||1}/>
+      </button>})}
+      {dayVacations.map(vacation=>{const owner=profiles[vacation.user_id];return <button className="calendarVacation smartCalendarCard" key={vacation.id} onClick={click=>{click.stopPropagation();onVacation(vacation)}}>
+        <CalendarAvatar profile={owner}/>
+        <span className="calendarCardText"><strong><Plane/> {vacation.country}</strong><small>{profileName(owner)}</small></span>
+        <span className="calendarCompactIcon"><Plane/></span>
+        <CalendarTooltip type="vacation" profile={owner} location={vacation.country} startDate={vacation.start_date} endDate={vacation.end_date}/>
+      </button>})}
+    </div>;
+  })}</div></div></section></div>;
+}
+
+function profileName(profile?: Profile) {
+  return profile?.display_name || profile?.username || "Membru";
+}
+
+function profileInitials(profile?: Profile) {
+  return profileName(profile).split(/\s+/).map(part => part[0]).join("").slice(0,2).toUpperCase();
+}
+
+function CalendarAvatar({ profile }: { profile?: Profile }) {
+  return <span className="calendarAvatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt=""/> : profileInitials(profile)}</span>;
+}
+
+function CalendarTooltip({type,title,profile,location,participantCount,startDate,endDate}:{type:"event"|"vacation";title?:string;profile?:Profile;location:string;participantCount?:number;startDate?:string;endDate?:string}) {
+  return <span className="calendarTooltip" role="tooltip">
+    <span className="tooltipOwner"><CalendarAvatar profile={profile}/><strong>{profileName(profile)}</strong></span>
+    {type==="event"?<><span>🍖 <strong>{title}</strong></span><span>👤 Organizator: {profileName(profile)}</span><span>📍 {location||"Fără locație"}</span><span>👥 {participantCount} {participantCount===1?"participant":"participanți"}</span></>:<><span>✈ <strong>Vacanță</strong></span><span>📍 {location}</span><span>📅 {startDate&&endDate?`${formatDate(startDate)} – ${formatDate(endDate)}`:""}</span></>}
+  </span>;
 }
