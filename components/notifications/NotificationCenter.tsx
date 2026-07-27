@@ -11,6 +11,7 @@ import {
   markAllNotificationsRead, markNotificationRead, NOTIFICATION_PAGE_SIZE,
 } from "@/lib/notifications";
 import type { AppNotification, NotificationType, Profile } from "@/types/database";
+import { useI18n } from "@/lib/i18n";
 
 const TYPE_ICONS: Partial<Record<NotificationType, typeof Bell>> = {
   group_invitation: UserPlus, group_member_joined: Users,
@@ -30,24 +31,22 @@ function initials(profile?: Profile | null) {
   return actorName(profile).split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase();
 }
 
-function relativeTime(value: string) {
-  const seconds = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
-  if (seconds < 60) return "acum";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h`;
-  const days = Math.floor(hours / 24);
-  return `${days} ${days === 1 ? "zi" : "zile"}`;
-}
-
 function dateGroup(value: string) {
   const date = new Date(value);
   const today = new Date();
   const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
   const difference = Math.round((todayDay - day) / 86400000);
-  return difference === 0 ? "Astăzi" : difference === 1 ? "Ieri" : "Mai vechi";
+  return difference === 0 ? "today" : difference === 1 ? "yesterday" : "older";
+}
+
+function notificationVariables(notification: AppNotification) {
+  const metadata = notification.metadata || {};
+  return {
+    actor: actorName(notification.actor),
+    title: String(metadata.title || metadata.event_title || metadata.plan_title || metadata.group_name || ""),
+    country: String(metadata.country || ""),
+  };
 }
 
 export const NotificationCenter = memo(function NotificationCenter({
@@ -56,6 +55,7 @@ export const NotificationCenter = memo(function NotificationCenter({
   userId: string;
   onNavigate: (notification: AppNotification) => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -82,12 +82,12 @@ export const NotificationCenter = memo(function NotificationCenter({
       setError("");
     } catch (caught) {
       setError(caught instanceof Error && caught.message.includes("notifications")
-        ? "Rulează migrarea 009_in_app_notifications.sql în Supabase."
-        : "Notificările nu au putut fi încărcate.");
+        ? t("notifications.migration")
+        : t("notifications.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [t, userId]);
 
   const refreshCount = useCallback(async () => {
     try { setUnread(await fetchUnreadCount(userId)); } catch { /* migration may not be installed yet */ }
@@ -137,7 +137,7 @@ export const NotificationCenter = memo(function NotificationCenter({
       const label = dateGroup(item.created_at);
       result.set(label, [...(result.get(label) || []), item]);
     });
-    return ["Astăzi", "Ieri", "Mai vechi"].map(label => [label, result.get(label) || []] as const).filter(([, values]) => values.length);
+    return ["today", "yesterday", "older"].map(label => [label, result.get(label) || []] as const).filter(([, values]) => values.length);
   }, [items]);
 
   async function openNotification(notification: AppNotification) {
@@ -179,30 +179,31 @@ export const NotificationCenter = memo(function NotificationCenter({
   }
 
   return <>
-    <button className="iconButton notificationBell" aria-label="Notificări" aria-expanded={open} onClick={() => setOpen(true)}><Bell/>{unread > 0 && <span>{unread > 99 ? "99+" : unread}</span>}</button>
+    <button className="iconButton notificationBell" aria-label={t("notifications.title")} aria-expanded={open} onClick={() => setOpen(true)}><Bell/>{unread > 0 && <span>{unread > 99 ? "99+" : unread}</span>}</button>
     {open && <div className="notificationBackdrop" onMouseDown={event => { if (event.target === event.currentTarget) setOpen(false); }}>
-      <aside className="notificationCenter" aria-label="Centrul de notificări">
+      <aside className="notificationCenter" aria-label={t("notifications.aria")}>
         <span className="sheetHandle"/>
-        <header><div><small>CIRCLE UPDATES</small><h2>Notificări</h2></div><button className="iconButton" onClick={() => setOpen(false)}><X/></button></header>
-        <div className="notificationActions"><button disabled={!unread} onClick={() => void markAll()}><CheckCheck/> Marchează toate ca citite</button><button disabled={!items.some(item => item.is_read)} onClick={() => setConfirmAction({ kind: "read" })}><Trash2/> Șterge cele citite</button></div>
+        <header><div><small>{t("notifications.updates")}</small><h2>{t("notifications.title")}</h2></div><button className="iconButton" onClick={() => setOpen(false)}><X/></button></header>
+        <div className="notificationActions"><button disabled={!unread} onClick={() => void markAll()}><CheckCheck/> {t("notifications.markAll")}</button><button disabled={!items.some(item => item.is_read)} onClick={() => setConfirmAction({ kind: "read" })}><Trash2/> {t("notifications.deleteRead")}</button></div>
         <div className="notificationScroll">
-          {loading && !items.length ? <NotificationSkeleton/> : error ? <div className="notificationEmpty"><CircleHelp/><h3>Notificări indisponibile</h3><p>{error}</p></div> : !items.length ? <div className="notificationEmpty"><img src="/brand/empty/notifications.svg" alt=""/><h3>Ești la zi</h3><p>Nu ai notificări noi.</p></div> : groups.map(([label, values]) => <section className="notificationGroup" key={label}><h3>{label}</h3>{values.map(notification => <NotificationRow key={notification.id} notification={notification} onOpen={() => void openNotification(notification)} onRead={event => void markOne(event, notification)} onDelete={event => { event.stopPropagation(); setConfirmAction({ kind: "one", id: notification.id }); }}/>)}</section>)}
-          {hasMore && <button className="loadMoreNotifications" disabled={loading} onClick={() => void loadPage(page + 1)}>{loading ? <Loader2 className="spin"/> : null} Încarcă mai multe</button>}
+          {loading && !items.length ? <NotificationSkeleton/> : error ? <div className="notificationEmpty"><CircleHelp/><h3>{t("notifications.unavailable")}</h3><p>{error}</p></div> : !items.length ? <div className="notificationEmpty"><img src="/brand/empty/notifications.svg" alt=""/><h3>{t("notifications.emptyTitle")}</h3><p>{t("notifications.emptyText")}</p></div> : groups.map(([label, values]) => <section className="notificationGroup" key={label}><h3>{t(`common.${label}`)}</h3>{values.map(notification => <NotificationRow key={notification.id} notification={notification} onOpen={() => void openNotification(notification)} onRead={event => void markOne(event, notification)} onDelete={event => { event.stopPropagation(); setConfirmAction({ kind: "one", id: notification.id }); }}/>)}</section>)}
+          {hasMore && <button className="loadMoreNotifications" disabled={loading} onClick={() => void loadPage(page + 1)}>{loading ? <Loader2 className="spin"/> : null} {t("notifications.loadMore")}</button>}
         </div>
       </aside>
     </div>}
-    {toast && <button className="notificationToast" onClick={() => void openNotification(toast)}><NotificationIcon type={toast.type}/><div><strong>{toast.title}</strong><span>{toast.message}</span></div><ChevronRight/></button>}
-    {confirmAction && <div className="notificationConfirmBack"><section><Trash2/><h3>{confirmAction.kind === "one" ? "Ștergi notificarea?" : "Ștergi notificările citite?"}</h3><p>Această acțiune nu poate fi anulată.</p><div><button className="secondary" onClick={() => setConfirmAction(null)}>Renunță</button><button className="dangerButton" onClick={() => void confirmDelete()}>Șterge</button></div></section></div>}
+    {toast && <button className="notificationToast" onClick={() => void openNotification(toast)}><NotificationIcon type={toast.type}/><div><strong>{t(`notifications.types.${toast.type}.title`, notificationVariables(toast))}</strong><span>{t(`notifications.types.${toast.type}.message`, notificationVariables(toast))}</span></div><ChevronRight/></button>}
+    {confirmAction && <div className="notificationConfirmBack"><section><Trash2/><h3>{confirmAction.kind === "one" ? t("notifications.deleteOneTitle") : t("notifications.deleteReadTitle")}</h3><p>{t("notifications.irreversible")}</p><div><button className="secondary" onClick={() => setConfirmAction(null)}>{t("common.cancel")}</button><button className="dangerButton" onClick={() => void confirmDelete()}>{t("common.delete")}</button></div></section></div>}
   </>;
 });
 
 function NotificationRow({ notification, onOpen, onRead, onDelete }: { notification: AppNotification; onOpen: () => void; onRead: (event: React.MouseEvent) => void; onDelete: (event: React.MouseEvent) => void }) {
+  const { formatRelative, t } = useI18n();
   return <article className={`notificationRow ${notification.is_read ? "" : "unread"}`} onClick={onOpen} role="button" tabIndex={0} onKeyDown={event => { if (event.key === "Enter") onOpen(); }}>
     <span className="notificationAvatar">{notification.actor?.avatar_url ? <img src={notification.actor.avatar_url} alt=""/> : initials(notification.actor)}</span>
     <span className="notificationTypeIcon"><NotificationIcon type={notification.type}/></span>
-    <div><strong>{notification.title}</strong><p>{notification.message}</p><time>{relativeTime(notification.created_at)}</time></div>
-    {!notification.is_read && <i aria-label="Necitită"/>}
-    <span className="notificationRowActions"><button title="Marchează ca citită" disabled={notification.is_read} onClick={onRead}><Check/></button><button title="Șterge" onClick={onDelete}><Trash2/></button></span>
+    <div><strong>{t(`notifications.types.${notification.type}.title`, notificationVariables(notification))}</strong><p>{t(`notifications.types.${notification.type}.message`, notificationVariables(notification))}</p><time>{formatRelative(notification.created_at)}</time></div>
+    {!notification.is_read && <i aria-label={t("notifications.unread")}/>}
+    <span className="notificationRowActions"><button title={t("notifications.markRead")} disabled={notification.is_read} onClick={onRead}><Check/></button><button title={t("common.delete")} onClick={onDelete}><Trash2/></button></span>
   </article>;
 }
 

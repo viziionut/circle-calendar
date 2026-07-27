@@ -18,16 +18,18 @@ import { MobileDashboard } from "./mobile/MobileDashboard";
 import { BrandLoader, BrandMark } from "./Brand";
 import { NotificationCenter } from "./notifications/NotificationCenter";
 import { fetchNotificationPreferences, saveNotificationPreferences } from "@/lib/notifications";
+import { useI18n } from "@/lib/i18n";
 
 type View = "home" | "calendar" | "vacations" | "media" | "groups" | "settings";
 type Dialog = "create" | "join" | "invite" | null;
 
 function isoToday() { return new Date().toISOString().slice(0, 10); }
-function monthTitle(date: Date) { return date.toLocaleDateString("ro-RO", { month: "long", year: "numeric" }); }
-function formatDate(value: string) { return new Date(`${value}T12:00:00`).toLocaleDateString("ro-RO", { day: "numeric", month: "long" }); }
+function monthTitle(date: Date, locale = "ro-RO") { return date.toLocaleDateString(locale, { month: "long", year: "numeric" }); }
+function formatDate(value: string, locale = "ro-RO") { return new Date(`${value}T12:00:00`).toLocaleDateString(locale, { day: "numeric", month: "long" }); }
 function normaliseCode(value: string) { return value.trim().toUpperCase().replace(/\s+/g, ""); }
 
 export function AppShell({ session }: { session: Session }) {
+  const { setLocale, t } = useI18n();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeGroupId, setActiveGroupId] = useState("");
@@ -56,8 +58,10 @@ export function AppShell({ session }: { session: Session }) {
   const loadProfile = useCallback(async () => {
     const { data, error } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
     if (error) console.error(error);
-    setProfile(data as Profile | null);
-  }, [session.user.id]);
+    const nextProfile = data as Profile | null;
+    setProfile(nextProfile);
+    if (nextProfile?.locale) setLocale(nextProfile.locale);
+  }, [session.user.id, setLocale]);
 
   const loadGroups = useCallback(async () => {
     const { data, error } = await supabase.from("group_members").select("groups(*)").eq("user_id", session.user.id);
@@ -221,7 +225,7 @@ export function AppShell({ session }: { session: Session }) {
     {toast && <div className="toast"><Check/> {toast}</div>}
   </main>;
 
-  const pageTitle = view === "home" ? "Acasă" : view === "vacations" ? "Vacanțe" : view === "media" ? "Amintiri" : view === "groups" ? "Grupuri" : view === "settings" ? "Setări" : "Calendar";
+  const pageTitle = t(view === "media" ? "nav.memories" : view === "settings" ? "nav.settings" : `nav.${view}`);
 
   return <main className={`app ${profile?.brand || "bros"} theme-${profile?.theme || "neon"}`}>
     <aside className={menuOpen ? "sidebar open" : "sidebar"}>
@@ -230,20 +234,20 @@ export function AppShell({ session }: { session: Session }) {
         <label className="groupPicker">GRUP ACTIV<select value={activeGroupId} onChange={event => setActiveGroupId(event.target.value)}>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
       </div>
       <nav className="sidebarScrollArea">
-        <button className={view === "home" ? "active" : ""} onClick={() => openView("home")}><Home/>Acasă</button>
-        <button className={view === "calendar" ? "active" : ""} onClick={() => openView("calendar")}><CalendarDays/>Calendar</button>
-        <button className={view === "vacations" ? "active" : ""} onClick={() => openView("vacations")}><Plane/>Vacanțe</button>
-        <button className={view === "media" ? "active" : ""} onClick={() => openView("media")}><Images/>Amintiri</button>
-        <button className={view === "groups" ? "active" : ""} onClick={() => openView("groups")}><Users/>Grupuri</button>
+        <button className={view === "home" ? "active" : ""} onClick={() => openView("home")}><Home/>{t("nav.home")}</button>
+        <button className={view === "calendar" ? "active" : ""} onClick={() => openView("calendar")}><CalendarDays/>{t("nav.calendar")}</button>
+        <button className={view === "vacations" ? "active" : ""} onClick={() => openView("vacations")}><Plane/>{t("nav.vacations")}</button>
+        <button className={view === "media" ? "active" : ""} onClick={() => openView("media")}><Images/>{t("nav.memories")}</button>
+        <button className={view === "groups" ? "active" : ""} onClick={() => openView("groups")}><Users/>{t("nav.groups")}</button>
         <div className="navDivider"/>
-        <button onClick={() => { setDialog("join"); setMenuOpen(false); }}><UserPlus/>Intră într-un grup</button>
-        <button onClick={() => { setDialog("invite"); setMenuOpen(false); }}><Send/>Invită membri</button>
-        <button className={view === "settings" ? "active" : ""} onClick={() => openView("settings")}><Settings/>Setări cont</button>
+        <button onClick={() => { setDialog("join"); setMenuOpen(false); }}><UserPlus/>{t("nav.join")}</button>
+        <button onClick={() => { setDialog("invite"); setMenuOpen(false); }}><Send/>{t("nav.invite")}</button>
+        <button className={view === "settings" ? "active" : ""} onClick={() => openView("settings")}><Settings/>{t("nav.settings")}</button>
         <AdminNavItem onNavigate={() => setMenuOpen(false)}/>
         <button className="logout" onClick={() => supabase.auth.signOut()}><LogOut/> Log out</button>
       </nav>
       <div className="sidebarFixedBottom">
-        <button className="inviteBox" onClick={() => setDialog("invite")}><small>COD INVITAȚIE</small><strong>{activeGroup?.invite_code}</strong><span><Share2/> Invită</span></button>
+        <button className="inviteBox" onClick={() => setDialog("invite")}><small>{t("nav.inviteCode")}</small><strong>{activeGroup?.invite_code}</strong><span><Share2/> {t("nav.invite")}</span></button>
       </div>
     </aside>
 
@@ -256,11 +260,11 @@ export function AppShell({ session }: { session: Session }) {
       {view === "vacations" && <VacationsPage vacations={vacations} groupId={activeGroupId} userId={session.user.id} memberNames={vacationMemberNames} onChanged={loadVacations}/>}
       {view === "media" && <div className="page"><section className="pageTitle"><small>CIRCLE MEMORIES</small><h1>Arhiva evenimentelor</h1><p>Fiecare album este creat automat din media încărcată în evenimente.</p></section><div className="albumCards">{events.filter(event => allMedia.some(media => media.event_id === event.id)).map(event => {const items=allMedia.filter(media => media.event_id===event.id);return <button key={event.id} className="albumCard" onClick={() => {setSelectedEvent(event);setModalOpen(true);}}><div className="albumCover">{items[0]?.mime_type.startsWith("video/") ? <video src={items[0]?.signed_url}/> : <img src={items[0]?.signed_url} alt=""/>}<span>{items.length}</span></div><div><strong>{event.title}</strong><small>{formatDate(event.event_date)} · {items.filter(item=>item.mime_type.startsWith("image/")).length} poze · {items.filter(item=>item.mime_type.startsWith("video/")).length} video</small></div></button>})}</div>{!allMedia.length && <div className="largeEmpty"><Images/><h3>Arhiva este goală</h3><p>Deschide un eveniment și adaugă poze sau videoclipuri.</p></div>}</div>}
       {view === "groups" && <GroupsPage groups={groups} activeGroupId={activeGroupId} onSelect={setActiveGroupId} onCreate={() => setDialog("create")} onJoin={() => setDialog("join")} onInvite={(groupId) => { setActiveGroupId(groupId); setDialog("invite"); }}/>} 
-      {view === "settings" && profile && <SettingsPage profile={profile} email={session.user.email || ""} onSaved={async () => { await loadProfile(); notify("Setările au fost salvate."); }}/>} 
+      {view === "settings" && profile && <SettingsPage profile={profile} email={session.user.email || ""} onSaved={async () => { await loadProfile(); notify(t("settings.saved")); }}/>}
     </section>
 
     <footer className="appBrandFooter"><BrandMark/><span>Circle Calendar · Plan. Share. Remember.</span></footer>
-    <nav className="mobileNav"><button className={view==="home"?"active":""} onClick={()=>setView("home")}><Home/><span>Acasă</span></button><button className={view==="calendar"?"active":""} onClick={()=>setView("calendar")}><CalendarDays/><span>Calendar</span></button><button className="mobilePlus" onClick={()=>setMobileActionsOpen(true)}><Plus/><span>Plan nou</span></button><button className={view==="groups"?"active":""} onClick={()=>setView("groups")}><Users/><span>Grup</span></button><button className={view==="settings"?"active":""} onClick={()=>setView("settings")}><UserCircle/><span>Profil</span></button></nav>
+    <nav className="mobileNav"><button className={view==="home"?"active":""} onClick={()=>setView("home")}><Home/><span>{t("nav.home")}</span></button><button className={view==="calendar"?"active":""} onClick={()=>setView("calendar")}><CalendarDays/><span>{t("nav.calendar")}</span></button><button className="mobilePlus" onClick={()=>setMobileActionsOpen(true)}><Plus/><span>{t("nav.newPlan")}</span></button><button className={view==="groups"?"active":""} onClick={()=>setView("groups")}><Users/><span>{t("nav.groups")}</span></button><button className={view==="settings"?"active":""} onClick={()=>setView("settings")}><UserCircle/><span>{t("nav.profile")}</span></button></nav>
 
     {modalOpen && <EventModal event={selectedEvent} initialDate={selectedDate || isoToday()} groupId={activeGroupId} userId={session.user.id} onClose={() => setModalOpen(false)} onSaved={async () => {await loadEvents();await loadMedia();}} onDeleted={async () => {await loadEvents();await loadMedia();}}/>}
     {dialog === "create" && <CreateGroupDialog onClose={() => setDialog(null)} onCreate={createGroup}/>} 
@@ -318,6 +322,7 @@ function GroupsPage({ groups, activeGroupId, onSelect, onCreate, onJoin, onInvit
 }
 
 function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: string; onSaved: () => Promise<void> }) {
+  const { locale, setLocale, t } = useI18n();
   const [displayName, setDisplayName] = useState(profile.display_name || "");
   const [username, setUsername] = useState(profile.username || "");
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || "");
@@ -371,7 +376,8 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
         username: username.trim() || null,
         avatar_url: finalAvatarUrl || null,
         brand,
-        theme
+        theme,
+        locale
       }).eq("id", profile.id);
       if (updateError) throw updateError;
       await saveNotificationPreferences(profile.id, notificationPrefs);
@@ -386,7 +392,7 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
   }
 
   return <div className="page settingsPage">
-    <section className="settingsHero"><div><small>CONTUL TĂU</small><h1>Profil și aspect</h1><p>Schimbările de aspect se văd imediat după salvare.</p></div></section>
+    <section className="settingsHero"><div><small>{t("settings.eyebrow")}</small><h1>{t("settings.title")}</h1><p>{t("settings.subtitle")}</p></div></section>
     <form className="settingsLayout" onSubmit={saveSettings}>
       <section className="profileEditorCard">
         <div className="avatarEditor">
@@ -413,6 +419,15 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
         </div>
       </section>
 
+      <section className="appearanceCard languageSettingsCard">
+        <div className="sectionHeading"><span aria-hidden="true">🌐</span><div><small>{t("language.eyebrow")}</small><h3>{t("language.title")}</h3></div></div>
+        <p>{t("language.description")}</p>
+        <div className="brandChoice languageChoice" role="radiogroup" aria-label={t("language.title")}>
+          <button type="button" role="radio" aria-checked={locale === "ro"} className={locale === "ro" ? "active" : ""} onClick={() => setLocale("ro")}><span>🇷🇴</span><strong>{t("language.ro")}</strong></button>
+          <button type="button" role="radio" aria-checked={locale === "en"} className={locale === "en" ? "active" : ""} onClick={() => setLocale("en")}><span>🇬🇧</span><strong>{t("language.en")}</strong></button>
+        </div>
+      </section>
+
       <section className="notificationSettingsCard">
         <div className="sectionHeading"><Bell/><div><small>NOTIFICĂRI</small><h3>Alege ce vrei să urmărești</h3></div></div>
         <p>Poți schimba oricând categoriile afișate în centrul de notificări.</p>
@@ -433,6 +448,7 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
 }
 
 function CalendarPage({month,setMonth,events,vacations,profiles,participantCounts,onEvent,onVacation,onCreateDate}:{month:Date;setMonth:(date:Date)=>void;events:EventItem[];vacations:Vacation[];profiles:Record<string,Profile>;participantCounts:Record<string,number>;onEvent:(event:EventItem)=>void;onVacation:(vacation:Vacation)=>void;onCreateDate:(date:string)=>void}) {
+  const { localeTag, t } = useI18n();
   const [compact, setCompact] = useState(false);
   const [sheetDate, setSheetDate] = useState("");
   const swipeStart = useRef({ x: 0, y: 0 });

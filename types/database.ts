@@ -1,4 +1,5 @@
 export type Brand = "bros" | "girls";
+export type AppLocale = "ro" | "en";
 export type RsvpStatus = "yes" | "maybe" | "no";
 
 export type Profile = {
@@ -8,6 +9,7 @@ export type Profile = {
   avatar_url: string | null;
   brand: Brand;
   theme: string;
+  locale: AppLocale;
   created_at?: string;
   last_seen_at?: string | null;
   account_status?: "active" | "suspended";
@@ -175,8 +177,8 @@ export type AppNotification = {
   group_id: string | null;
   actor_id: string | null;
   type: NotificationType;
-  title: string;
-  message: string;
+  title?: string;
+  message?: string;
   entity_type: "group" | "event" | "quick_plan" | "vacation" | null;
   entity_id: string | null;
   metadata: Record<string, unknown>;

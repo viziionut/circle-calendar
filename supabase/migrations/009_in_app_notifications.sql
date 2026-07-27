@@ -24,8 +24,6 @@ create table if not exists public.notifications (
     'vacation_created',
     'event_tomorrow','quick_plan_response_due'
   )),
-  title text not null,
-  message text not null default '',
   entity_type text check (entity_type in ('group','event','quick_plan','vacation')),
   entity_id uuid,
   metadata jsonb not null default '{}'::jsonb,
@@ -134,11 +132,11 @@ begin
   if not enabled then return; end if;
 
   insert into public.notifications (
-    user_id, group_id, actor_id, type, title, message,
+    user_id, group_id, actor_id, type,
     entity_type, entity_id, metadata, dedupe_key
   ) values (
     target_user_id, target_group_id, source_actor_id, notification_type,
-    notification_title, notification_message, target_entity_type,
+    target_entity_type,
     target_entity_id, coalesce(notification_metadata, '{}'::jsonb),
     notification_dedupe_key
   )
@@ -182,11 +180,11 @@ begin
     if member.user_id = new.user_id then
       perform public.emit_notification(member.user_id,new.group_id,owner,'group_invitation',
         'Bine ai venit în ' || group_name,'Invitația a fost acceptată. Acum faci parte din grup.',
-        'group',new.group_id,'{}'::jsonb,'group-invitation:'||new.group_id||':'||new.user_id);
+        'group',new.group_id,jsonb_build_object('group_name',group_name),'group-invitation:'||new.group_id||':'||new.user_id);
     else
       perform public.emit_notification(member.user_id,new.group_id,new.user_id,'group_member_joined',
         actor_name || ' a intrat în grup',group_name || ' are un membru nou.',
-        'group',new.group_id,'{}'::jsonb,'member-joined:'||new.group_id||':'||new.user_id);
+        'group',new.group_id,jsonb_build_object('group_name',group_name),'member-joined:'||new.group_id||':'||new.user_id);
     end if;
   end loop;
   return new;
@@ -219,7 +217,7 @@ begin
   end if;
   for member in select user_id from public.group_members where group_id=event_row.group_id loop
     perform public.emit_notification(member.user_id,event_row.group_id,actor,ntype,ntitle,nmessage,
-      'event',event_row.id,jsonb_build_object('event_date',event_row.event_date),dkey);
+      'event',event_row.id,jsonb_build_object('event_date',event_row.event_date,'title',event_row.title),dkey);
   end loop;
   return event_row;
 end $$;
@@ -237,7 +235,7 @@ begin
     perform public.emit_notification(member.user_id,new.group_id,new.user_id,'vacation_created',
       actor_name || ' a adăugat o vacanță',
       new.country || ' · ' || to_char(new.start_date,'DD Mon') || ' – ' || to_char(new.end_date,'DD Mon'),
-      'vacation',new.id,jsonb_build_object('start_date',new.start_date,'end_date',new.end_date),
+      'vacation',new.id,jsonb_build_object('start_date',new.start_date,'end_date',new.end_date,'country',new.country),
       'vacation-created:'||new.id);
   end loop;
   return new;
@@ -263,7 +261,7 @@ begin
   end if;
   for member in select user_id from public.group_members where group_id=new.group_id loop
     perform public.emit_notification(member.user_id,new.group_id,actor,ntype,ntitle,nmessage,
-      'quick_plan',new.id,'{}'::jsonb,ntype||':'||new.id);
+      'quick_plan',new.id,jsonb_build_object('title',new.title),ntype||':'||new.id);
   end loop;
   return new;
 end $$;
@@ -284,14 +282,14 @@ begin
 
   perform public.emit_notification(plan_row.created_by,plan_row.group_id,new.user_id,'quick_plan_voted',
     actor_name||' a votat „'||vote_label||'”',plan_row.title||' · '||to_char(option_row.start_date,'DD Mon'),
-    'quick_plan',plan_row.id,jsonb_build_object('option_id',new.option_id,'vote',new.vote),
+    'quick_plan',plan_row.id,jsonb_build_object('option_id',new.option_id,'vote',new.vote,'title',plan_row.title),
     'plan-vote:'||new.option_id||':'||new.user_id||':'||new.updated_at);
 
   if nullif(trim(coalesce(new.comment,'')),'') is not null
      and (tg_op='INSERT' or new.comment is distinct from old.comment) then
     perform public.emit_notification(plan_row.created_by,plan_row.group_id,new.user_id,'quick_plan_comment',
       actor_name||' a adăugat un comentariu',new.comment,'quick_plan',plan_row.id,
-      jsonb_build_object('option_id',new.option_id),'plan-comment:'||new.option_id||':'||new.user_id||':'||new.updated_at);
+      jsonb_build_object('option_id',new.option_id,'title',plan_row.title),'plan-comment:'||new.option_id||':'||new.user_id||':'||new.updated_at);
   end if;
 
   select count(*),min(gm.user_id) into missing_count,missing_user
@@ -304,7 +302,7 @@ begin
   if missing_count=1 then
     perform public.emit_notification(missing_user,plan_row.group_id,new.user_id,'quick_plan_last_vote',
       'Mai lipsește un singur vot','Răspunde la '||plan_row.activity_emoji||' '||plan_row.title,
-      'quick_plan',plan_row.id,'{}'::jsonb,'plan-last-vote:'||plan_row.id||':'||missing_user);
+      'quick_plan',plan_row.id,jsonb_build_object('title',plan_row.title),'plan-last-vote:'||plan_row.id||':'||missing_user);
   end if;
   return new;
 end $$;
@@ -326,7 +324,7 @@ begin
   loop
     perform public.emit_notification(item.user_id,item.group_id,null,'event_tomorrow',
       'Evenimentul începe mâine',item.title,'event',item.id,
-      jsonb_build_object('event_date',item.event_date),'event-tomorrow:'||item.id||':'||run_date);
+      jsonb_build_object('event_date',item.event_date,'title',item.title),'event-tomorrow:'||item.id||':'||run_date);
   end loop;
   for item in
     select qp.id,qp.group_id,qp.title,qp.activity_emoji,gm.user_id from public.quick_plans qp
@@ -338,7 +336,7 @@ begin
   loop
     perform public.emit_notification(item.user_id,item.group_id,null,'quick_plan_response_due',
       'Un plan așteaptă răspunsul tău',item.activity_emoji||' '||item.title,
-      'quick_plan',item.id,'{}'::jsonb,'plan-response:'||item.id||':'||run_date);
+      'quick_plan',item.id,jsonb_build_object('title',item.title),'plan-response:'||item.id||':'||run_date);
   end loop;
   select count(*) into after_count from public.notifications;
   return (after_count-before_count)::integer;
