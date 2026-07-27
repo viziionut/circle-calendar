@@ -73,7 +73,9 @@
     "saved": "Settings saved.",
     "saveFailed": "Settings could not be saved.",
     "imageOnly": "Choose an image file.",
-    "imageSize": "The image must be smaller than 5 MB."
+    "imageSize": "The image must be smaller than 5 MB.",
+    "signOut": "Sign out",
+    "signOutHint": "End the current session on this device."
   },
   "notifications": {
     "title": "Notifications",

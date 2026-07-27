@@ -298,9 +298,52 @@ button:disabled,.primary:disabled,.secondary:disabled{opacity:.48;filter:saturat
 @media(max-width:1023px){.topActions .notificationBell{display:grid!important}.notificationBackdrop{z-index:170;display:flex;align-items:flex-end}.notificationCenter{position:relative;inset:auto;width:100%;max-width:none;max-height:94dvh;border-radius:28px 28px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom);animation:sheetUp .3s cubic-bezier(.2,.8,.2,1)}.notificationCenter>.sheetHandle{display:block;margin-top:9px}.notificationCenter>header{padding-top:7px}.notificationActions button{min-height:44px}.notificationScroll{min-height:50dvh}.notificationRow{grid-template-columns:44px 30px 1fr auto;min-height:86px;padding:13px 9px}.notificationRowActions{position:static;grid-column:3/5;justify-self:end;opacity:1}.notificationRowActions button{width:36px;height:36px}.notificationToast{left:14px;right:14px;bottom:calc(92px + env(safe-area-inset-bottom));width:auto}.notificationToggleList{grid-template-columns:1fr}.notificationSettingsCard{padding:18px;border-radius:var(--radius-lg)}}
 @media(max-width:420px){.notificationActions{display:grid;grid-template-columns:1fr}.notificationCenter>header{padding-left:16px;padding-right:16px}.notificationRow{grid-template-columns:39px 26px 1fr auto;gap:7px}.notificationAvatar{width:39px;height:39px}.notificationTypeIcon{width:26px;height:26px}.notificationRow>div>strong{font-size:11px}}
 .languageSettingsCard>p{margin:-8px 0 18px;color:var(--text-muted)}.languageChoice{grid-template-columns:repeat(2,minmax(0,1fr))}.languageChoice button{min-height:72px}.authHeaderActions{display:flex;align-items:center;gap:8px}
+.mobileSignOutCard{display:none}
+@media(max-width:1023px){.mobileSignOutCard{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px;border:1px solid color-mix(in srgb,var(--brand-danger) 24%,var(--border));border-radius:var(--radius-lg);background:color-mix(in srgb,var(--brand-danger) 6%,var(--panel))}.mobileSignOutCard>div{min-width:0;display:grid;gap:4px}.mobileSignOutCard small{color:var(--muted);line-height:1.4}.mobileSignOutCard button{min-height:46px;display:flex;align-items:center;justify-content:center;gap:7px;flex:0 0 auto;padding:0 15px;border:1px solid color-mix(in srgb,var(--brand-danger) 35%,transparent);border-radius:var(--radius-md);background:color-mix(in srgb,var(--brand-danger) 10%,transparent);color:var(--brand-danger);font-weight:850}.mobileSignOutCard button:active{transform:scale(.97)}.mobileSignOutCard svg{width:18px}}
+@media(max-width:430px){.mobileSignOutCard{align-items:stretch;flex-direction:column}.mobileSignOutCard button{width:100%}}
 
 /* Quick Plan step 5 clarity */
 .quickPlanFinalStep .participantGauge{max-width:640px;margin:28px auto 24px;padding:22px;border:1px solid var(--border);border-radius:20px;background:linear-gradient(145deg,var(--color-white-3),transparent)}
 .participantValue{display:grid;gap:8px;text-align:center}.participantGauge .participantValue strong{font-size:clamp(30px,6vw,54px);line-height:1.1}.participantValue span{min-height:20px;font-size:12px;line-height:1.5}.participantGauge input[type="range"]{height:34px;margin:20px 0 2px;cursor:pointer;touch-action:pan-x}
 .quickPlanSummary{display:grid;max-width:640px;padding:20px;gap:18px;border-radius:20px}.summaryActivity{display:flex;align-items:center;gap:13px;padding-bottom:15px;border-bottom:1px solid var(--border)}.summaryActivity>span{font-size:34px}.summaryActivity>div{display:grid;gap:4px}.quickPlanSummary .summaryActivity strong{font-size:18px}.quickPlanSummary dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0}.quickPlanSummary dl>div{min-width:0;display:grid;gap:5px}.quickPlanSummary dt{color:var(--muted);font-size:9px}.quickPlanSummary dd{margin:0;color:var(--text);font-size:12px;font-weight:800;overflow-wrap:anywhere}.searchPhaseText{animation:searchPhaseIn .22s ease}@keyframes searchPhaseIn{from{opacity:0;transform:translateY(3px)}}.quickPlanInlineError{overflow-wrap:anywhere}
 @media(max-width:600px){.quickPlanWizard{height:100dvh;padding-bottom:env(safe-area-inset-bottom);overflow-x:hidden}.quickPlanWizardBody{min-width:0;padding-bottom:16px}.quickPlanFinalStep .participantGauge{margin:20px 0 14px;padding:17px 14px}.participantGauge input[type="range"]{height:44px;margin:14px 0 0}.quickPlanSummary{margin:0;padding:16px;gap:14px}.quickPlanSummary dl{grid-template-columns:1fr;gap:10px}.quickPlanSummary dl>div{grid-template-columns:minmax(105px,.8fr) 1fr;align-items:center}.quickPlanWizard>footer{gap:9px;padding-bottom:calc(14px + env(safe-area-inset-bottom))}.quickPlanWizard>footer button{min-width:0;max-width:60%;white-space:normal}.findButton{flex:1}.quickPlanInlineError{margin-bottom:4px}}
+
+/* Mobile calendar: native-width layout without the legacy 690px desktop canvas. */
+@media(max-width:767px){
+  .app:has(.calendarPanel){width:100%;min-width:0;min-height:100dvh;padding-bottom:0}
+  .mainContent:has(.calendarPanel){width:100%;min-width:0;min-height:calc(100dvh - 64px);margin-left:0}
+  .mainContent>.page:has(>.calendarPanel){width:100%;max-width:100%;min-width:0;margin:0;padding:12px 12px calc(92px + env(safe-area-inset-bottom))}
+  .calendarPanel,.compactCalendar,.largeCalendar{width:100%;max-width:100%;min-width:0;margin:0;overflow:visible}
+  .calendarViewport,.compactCalendar .calendarViewport,.largeCalendar .calendarViewport{width:100%;max-width:100%;min-width:0;overflow:visible}
+  .calendarViewport>.weekDays,.calendarViewport>.calendarGrid,.largeCalendar .calendarViewport>.weekDays,.largeCalendar .calendarViewport>.calendarGrid,.compactCalendar .weekDays,.compactCalendar .calendarGrid{width:100%;min-width:0;grid-template-columns:repeat(7,minmax(0,1fr))}
+  .calendarHeader{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:15px 13px 12px}
+  .calendarHeader>div:first-child{min-width:0}.calendarHeader small{font-size:8px}.calendarHeader h1{margin:4px 0 0;font-size:clamp(21px,7vw,27px);line-height:1.1;white-space:nowrap}
+  .calendarHeader>div:last-child{width:auto;display:grid;grid-template-columns:44px auto 44px;align-items:center;justify-content:end;gap:5px}
+  .calendarHeader .calendarSizeButton{display:none}
+  .calendarHeader>div:last-child .iconButton{width:44px;height:44px;display:grid;place-items:center;padding:0}
+  .calendarHeader>div:last-child button:not(.iconButton):not(.calendarSizeButton){min-width:58px;min-height:44px;padding:0 8px;border:1px solid var(--border);border-radius:11px;background:var(--color-white-3)}
+  .calendarHint{margin:0;padding:0 13px 11px;font-size:10px;line-height:1.45}
+  .weekDays span{min-width:0;padding:9px 0;text-align:center;font-size:10px}
+  .day,.compactCalendar .day,.largeCalendar .day{position:relative;min-width:0;min-height:64px;padding:5px 3px;text-align:center;overflow:visible;transition:background .16s ease,transform .12s ease}
+  .day:not(.muted):active{z-index:2;background:var(--accent-soft);transform:scale(.96)}
+  .day>b,.compactCalendar .day>b{display:grid;place-items:center;width:25px;height:25px;margin:0 auto;font-size:11px;line-height:1}
+  .day.todayGlow>b{border-radius:9px;background:var(--accent);color:#04101c;box-shadow:0 0 12px color-mix(in srgb,var(--accent) 42%,transparent)}
+  .calendarGrid .day>button.smartCalendarCard,.compactCalendar .day>button.smartCalendarCard,.largeCalendar .day>button.smartCalendarCard{width:100%;min-width:0;min-height:8px;height:8px;margin-top:3px;padding:0;border:0;border-radius:999px;background:var(--accent);display:block;overflow:visible}
+  .calendarGrid .day>button.calendarVacation{background:var(--color-vacation)}
+  .smartCalendarCard .calendarAvatar,.smartCalendarCard .calendarCardText,.smartCalendarCard .calendarCompactIcon{display:none!important}
+  .calendarMoreButton{min-height:20px!important;height:20px!important;margin-top:2px!important;padding:0!important;line-height:18px!important}
+  .app:has(.calendarPanel)>.appBrandFooter{display:none}
+  .mobileNav{bottom:max(8px,env(safe-area-inset-bottom))}
+}
+@media(max-width:340px){
+  .mainContent>.page:has(>.calendarPanel){padding-left:10px;padding-right:10px}
+  .calendarHeader{grid-template-columns:1fr;padding-left:11px;padding-right:11px}
+  .calendarHeader>div:last-child{width:100%;justify-content:space-between}
+  .calendarHeader h1{font-size:22px}
+  .day,.compactCalendar .day,.largeCalendar .day{min-height:58px;padding-left:2px;padding-right:2px}
+}
+@media(max-width:767px) and (orientation:landscape){
+  .mainContent>.page:has(>.calendarPanel){padding-bottom:calc(82px + env(safe-area-inset-bottom))}
+  .calendarHeader{padding-top:11px;padding-bottom:9px}.calendarHint{display:none}
+  .day,.compactCalendar .day,.largeCalendar .day{min-height:54px}
+}

@@ -442,6 +442,11 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
         </div>
       </section>
 
+      <section className="mobileSignOutCard">
+        <div><strong>{t("settings.signOut")}</strong><small>{t("settings.signOutHint")}</small></div>
+        <button type="button" onClick={() => void supabase.auth.signOut()}><LogOut/> {t("settings.signOut")}</button>
+      </section>
+
       <div className="settingsSaveBar">{error && <p className="errorMessage">{error}</p>}<button className="primary" disabled={busy}><Check/> {busy ? "Se salvează…" : "Salvează modificările"}</button></div>
     </form>
   </div>;

@@ -73,7 +73,9 @@
     "saved": "Setările au fost salvate.",
     "saveFailed": "Setările nu au putut fi salvate.",
     "imageOnly": "Alege un fișier imagine.",
-    "imageSize": "Imaginea trebuie să fie mai mică de 5 MB."
+    "imageSize": "Imaginea trebuie să fie mai mică de 5 MB.",
+    "signOut": "Deconectare",
+    "signOutHint": "Închide sesiunea curentă pe acest dispozitiv."
   },
   "notifications": {
     "title": "Notificări",
