@@ -169,6 +169,24 @@
       "3": "Calculating the best options..."
     }
   },
+  "calendar": {
+    "eyebrow": "CALENDAR",
+    "selectMonth": "Select month",
+    "selectYear": "Select year",
+    "nextEvent": "Next event",
+    "previousEvent": "Previous event",
+    "futureEvents": "Upcoming events",
+    "noFutureEvents": "There are no upcoming events",
+    "goToEvent": "Go to event",
+    "navigation": "Calendar navigation",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "compact": "Compact",
+    "large": "Large",
+    "expand": "Expand calendar",
+    "oneDayEvent": "One-day event",
+    "hint": "Swipe left or right to change the month. Tap a day for details."
+  },
   "errors": {
     "accessChecking": "Checking access…",
     "suspended": "Account suspended",

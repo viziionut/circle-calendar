@@ -2,7 +2,7 @@
 
 import {
   Bell, CalendarDays, Camera, Check, ChevronLeft, ChevronRight, Clipboard, Upload, Maximize2, Minimize2,
-  Home, Images, Link2, LogOut, Menu, Plane, Plus, Send, Settings,
+  Compass, Home, Images, Link2, LogOut, Menu, Plane, Plus, Send, Settings, SkipBack, SkipForward,
   Share2, Sparkles, UserCircle, UserPlus, Users, X
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -19,6 +19,10 @@ import { BrandLoader, BrandMark } from "./Brand";
 import { NotificationCenter } from "./notifications/NotificationCenter";
 import { fetchNotificationPreferences, saveNotificationPreferences } from "@/lib/notifications";
 import { useI18n } from "@/lib/i18n";
+import {
+  eventNavigationTarget, navigableEvents, nextCalendarEvent,
+  previousCalendarEvent,
+} from "@/lib/calendarNavigation";
 
 type View = "home" | "calendar" | "vacations" | "media" | "groups" | "settings";
 type Dialog = "create" | "join" | "invite" | null;
@@ -256,7 +260,7 @@ export function AppShell({ session }: { session: Session }) {
 
       {view === "home" && <><div className="page desktopDashboard"><section className="welcome"><div><small>BINE AI REVENIT</small><h1>Salut, {profile?.display_name || profile?.username || "prietene"} 👋</h1><p>Următorul eveniment, albumele recente și grupul tău sunt aici.</p></div><button className="primary" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Creează eveniment</button></section><div className="dashboardGrid"><PendingQuickPlans groups={groups} currentUserId={session.user.id}/><section className="panel"><header><div><small>URMEAZĂ</small><h3>Evenimente viitoare</h3></div><button onClick={() => setView("calendar")}>Vezi calendarul</button></header>{upcoming.length ? upcoming.map(event => <button className="eventListRow" key={event.id} onClick={() => {setSelectedEvent(event);setModalOpen(true);}}><span className="dateBox"><b>{new Date(`${event.event_date}T12:00:00`).getDate()}</b><small>{new Date(`${event.event_date}T12:00:00`).toLocaleDateString("ro-RO",{month:"short"})}</small></span><span><strong>{event.title}</strong><small>{event.event_time?.slice(0,5) || "Fără oră"} · {event.location || "Fără locație"}</small></span></button>) : <div className="emptyState brandedEmpty"><img src="/brand/empty/events.svg" alt=""/><span>Nu ai evenimente viitoare.</span></div>}</section><section className="panel memoryPreview"><header><div><small>ALBUME</small><h3>Media recentă</h3></div><button onClick={() => setView("media")}>Vezi toate</button></header><div className="miniMediaGrid">{allMedia.slice(0,6).map(item => item.mime_type.startsWith("video/") ? <video key={item.id} src={item.signed_url}/> : <img key={item.id} src={item.signed_url} alt=""/> )}</div>{!allMedia.length && <div className="emptyState"><Camera/> Pozele vor apărea aici după ce le adaugi într-un eveniment.</div>}</section></div></div><MobileDashboard profile={profile} groups={groups} activeGroupId={activeGroupId} currentUserId={session.user.id} events={events} vacations={vacations} onEvent={event=>{setSelectedEvent(event);setSelectedDate(event.event_date);setModalOpen(true);}} onCalendar={()=>setView("calendar")} onVacations={()=>setView("vacations")} onRefresh={async()=>{await Promise.all([loadGroups(),loadEvents(),loadVacations()])}}/></>}
 
-      {view === "calendar" && <CalendarPage month={month} setMonth={setMonth} events={events} vacations={vacations} profiles={calendarProfiles} participantCounts={eventParticipantCounts} onEvent={event => {setSelectedEvent(event);setSelectedDate(event.event_date);setModalOpen(true);}} onVacation={() => setView("vacations")} onCreateDate={date => {setSelectedEvent(null);setSelectedDate(date);setModalOpen(true);}}/>}
+      {view === "calendar" && <CalendarPage groupId={activeGroupId} month={month} setMonth={setMonth} events={events} vacations={vacations} profiles={calendarProfiles} participantCounts={eventParticipantCounts} onEvent={event => {setSelectedEvent(event);setSelectedDate(event.event_date);setModalOpen(true);}} onVacation={() => setView("vacations")} onCreateDate={date => {setSelectedEvent(null);setSelectedDate(date);setModalOpen(true);}}/>}
       {view === "vacations" && <VacationsPage vacations={vacations} groupId={activeGroupId} userId={session.user.id} memberNames={vacationMemberNames} onChanged={loadVacations}/>}
       {view === "media" && <div className="page"><section className="pageTitle"><small>CIRCLE MEMORIES</small><h1>Arhiva evenimentelor</h1><p>Fiecare album este creat automat din media încărcată în evenimente.</p></section><div className="albumCards">{events.filter(event => allMedia.some(media => media.event_id === event.id)).map(event => {const items=allMedia.filter(media => media.event_id===event.id);return <button key={event.id} className="albumCard" onClick={() => {setSelectedEvent(event);setModalOpen(true);}}><div className="albumCover">{items[0]?.mime_type.startsWith("video/") ? <video src={items[0]?.signed_url}/> : <img src={items[0]?.signed_url} alt=""/>}<span>{items.length}</span></div><div><strong>{event.title}</strong><small>{formatDate(event.event_date)} · {items.filter(item=>item.mime_type.startsWith("image/")).length} poze · {items.filter(item=>item.mime_type.startsWith("video/")).length} video</small></div></button>})}</div>{!allMedia.length && <div className="largeEmpty"><Images/><h3>Arhiva este goală</h3><p>Deschide un eveniment și adaugă poze sau videoclipuri.</p></div>}</div>}
       {view === "groups" && <GroupsPage groups={groups} activeGroupId={activeGroupId} onSelect={setActiveGroupId} onCreate={() => setDialog("create")} onJoin={() => setDialog("join")} onInvite={(groupId) => { setActiveGroupId(groupId); setDialog("invite"); }}/>} 
@@ -452,10 +456,13 @@ function SettingsPage({ profile, email, onSaved }: { profile: Profile; email: st
   </div>;
 }
 
-function CalendarPage({month,setMonth,events,vacations,profiles,participantCounts,onEvent,onVacation,onCreateDate}:{month:Date;setMonth:(date:Date)=>void;events:EventItem[];vacations:Vacation[];profiles:Record<string,Profile>;participantCounts:Record<string,number>;onEvent:(event:EventItem)=>void;onVacation:(vacation:Vacation)=>void;onCreateDate:(date:string)=>void}) {
+function CalendarPage({groupId,month,setMonth,events,vacations,profiles,participantCounts,onEvent,onVacation,onCreateDate}:{groupId:string;month:Date;setMonth:(date:Date)=>void;events:EventItem[];vacations:Vacation[];profiles:Record<string,Profile>;participantCounts:Record<string,number>;onEvent:(event:EventItem)=>void;onVacation:(vacation:Vacation)=>void;onCreateDate:(date:string)=>void}) {
   const { localeTag, t } = useI18n();
   const [compact, setCompact] = useState(false);
   const [sheetDate, setSheetDate] = useState("");
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState("");
+  const [highlightedDate, setHighlightedDate] = useState("");
   const swipeStart = useRef({ x: 0, y: 0 });
   useEffect(() => {
     const saved = window.localStorage.getItem("circle-calendar-compact");
@@ -469,15 +476,93 @@ function CalendarPage({month,setMonth,events,vacations,profiles,participantCount
   const today=isoToday();
   const sheetEvents=events.filter(event=>event.event_date===sheetDate);
   const sheetVacations=vacations.filter(vacation=>vacation.start_date<=sheetDate&&vacation.end_date>=sheetDate);
-  return <div className="page"><section className={`calendarPanel ${compact?"compactCalendar":"largeCalendar"}`} onTouchStart={event=>{swipeStart.current={x:event.touches[0].clientX,y:event.touches[0].clientY}}} onTouchEnd={event=>{const dx=event.changedTouches[0].clientX-swipeStart.current.x;const dy=event.changedTouches[0].clientY-swipeStart.current.y;if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.3)setMonth(new Date(year,currentMonth+(dx<0?1:-1),1))}}><header className="calendarHeader"><div><small>CALENDAR</small><h1>{monthTitle(month)}</h1></div><div><button className="calendarSizeButton" onClick={toggleCompact} title={compact?"Mărește calendarul":"Micșorează calendarul"}>{compact?<Maximize2/>:<Minimize2/>}<span>{compact?"Mare":"Compact"}</span></button><button className="iconButton" onClick={()=>setMonth(new Date(year,currentMonth-1,1))}><ChevronLeft/></button><button onClick={()=>setMonth(new Date())}>Astăzi</button><button className="iconButton" onClick={()=>setMonth(new Date(year,currentMonth+1,1))}><ChevronRight/></button></div></header><p className="calendarHint">Glisează stânga sau dreapta pentru a schimba luna. Apasă pe o zi pentru detalii.</p><div className="calendarViewport"><div className="weekDays">{["L","Ma","Mi","J","V","S","D"].map(day=><span key={day}>{day}</span>)}</div><div className="calendarGrid">{cells.map((day,index)=>{
+  const orderedEvents = useMemo(() => navigableEvents(events, groupId), [events, groupId]);
+  const futureEvents = useMemo(() => orderedEvents.filter(event => event.event_date >= isoToday()).slice(0, 50), [orderedEvents]);
+  const monthNames = useMemo(() => Array.from({ length: 12 }, (_, value) =>
+    new Intl.DateTimeFormat(localeTag, { month: "long" }).format(new Date(2026, value, 1))), [localeTag]);
+  const currentYear = new Date().getFullYear();
+  const eventYears = orderedEvents.map(event => Number(event.event_date.slice(0, 4)));
+  const years = Array.from(new Set([
+    ...Array.from({ length: 26 }, (_, index) => currentYear - 10 + index),
+    ...eventYears,
+  ])).sort((left, right) => left - right);
+  const monthStart = `${year}-${String(currentMonth + 1).padStart(2, "0")}-01`;
+  const monthEnd = `${year}-${String(currentMonth + 1).padStart(2, "0")}-${String(days).padStart(2, "0")}`;
+  const previousEvent = previousCalendarEvent(orderedEvents, monthStart);
+  const isViewingFutureMonth = monthStart.slice(0, 7) > isoToday().slice(0, 7);
+  const nextEvent = isViewingFutureMonth
+    ? nextCalendarEvent(orderedEvents, monthEnd)
+    : futureEvents[0] || null;
+
+  const navigateToMonth = useCallback((targetYear: number, targetMonth: number) => {
+    setMonth(new Date(targetYear, targetMonth, 1));
+  }, [setMonth]);
+
+  const navigateToDate = useCallback((date: string) => {
+    const parsed = new Date(`${date}T12:00:00`);
+    navigateToMonth(parsed.getFullYear(), parsed.getMonth());
+    setHighlightedDate(date);
+    window.setTimeout(() => setHighlightedDate(current => current === date ? "" : current), 1800);
+  }, [navigateToMonth]);
+
+  const navigateToEvent = useCallback((event: EventItem) => {
+    const target = eventNavigationTarget(event);
+    setMonth(target.visibleMonth);
+    setSelectedEventId(target.selectedEventId);
+    setHighlightedDate(target.selectedDate);
+    setNavigationOpen(false);
+    window.setTimeout(() => setHighlightedDate(current => current === target.selectedDate ? "" : current), 1800);
+    if (window.innerWidth < 1024) setSheetDate(target.selectedDate);
+    else window.setTimeout(() => onEvent(event), 80);
+  }, [onEvent, setMonth]);
+
+  useEffect(() => {
+    if (!navigationOpen) return;
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setNavigationOpen(false); };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [navigationOpen]);
+
+  useEffect(() => {
+    if (!highlightedDate) return;
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(`[data-calendar-date="${highlightedDate}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [highlightedDate, month]);
+  return <><div className="page"><section className={`calendarPanel ${compact?"compactCalendar":"largeCalendar"}`} onTouchStart={event=>{swipeStart.current={x:event.touches[0].clientX,y:event.touches[0].clientY}}} onTouchEnd={event=>{const dx=event.changedTouches[0].clientX-swipeStart.current.x;const dy=event.changedTouches[0].clientY-swipeStart.current.y;if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.3)navigateToMonth(year,currentMonth+(dx<0?1:-1))}}>
+    <header className="calendarHeader">
+      <div><small>{t("calendar.eyebrow")}</small><h1>{monthTitle(month, localeTag)}</h1></div>
+      <button className="mobileCalendarNavigationButton" onClick={()=>setNavigationOpen(true)} aria-label={t("calendar.navigation")}><Compass/> {t("calendar.navigation")}</button>
+      <div className="calendarDesktopNavigation">
+        <label><span className="srOnly">{t("calendar.selectMonth")}</span><select aria-label={t("calendar.selectMonth")} value={currentMonth} onChange={event=>navigateToMonth(year,Number(event.target.value))}>{monthNames.map((name,index)=><option value={index} key={name}>{name}</option>)}</select></label>
+        <label><span className="srOnly">{t("calendar.selectYear")}</span><select aria-label={t("calendar.selectYear")} value={year} onChange={event=>navigateToMonth(Number(event.target.value),currentMonth)}>{years.map(value=><option value={value} key={value}>{value}</option>)}</select></label>
+        <div className="calendarEventSelector">
+          <button disabled={!nextEvent} onClick={()=>nextEvent&&navigateToEvent(nextEvent)}><CalendarDays/> {t("calendar.nextEvent")}</button>
+          <select aria-label={t("calendar.futureEvents")} defaultValue="" disabled={!futureEvents.length} onChange={event=>{const selected=futureEvents.find(item=>item.id===event.target.value);if(selected)navigateToEvent(selected);event.currentTarget.value="";}}>
+            <option value="">{futureEvents.length?t("calendar.goToEvent"):t("calendar.noFutureEvents")}</option>
+            {futureEvents.map(item=><option value={item.id} key={item.id}>{new Date(`${item.event_date}T12:00:00`).toLocaleDateString(localeTag,{day:"numeric",month:"short"})} · {item.title}</option>)}
+          </select>
+        </div>
+        <button className="iconButton" title={t("calendar.previousEvent")} aria-label={t("calendar.previousEvent")} disabled={!previousEvent} onClick={()=>previousEvent&&navigateToEvent(previousEvent)}><SkipBack/></button>
+        <button className="iconButton" title={t("calendar.nextEvent")} aria-label={t("calendar.nextEvent")} disabled={!nextEvent} onClick={()=>nextEvent&&navigateToEvent(nextEvent)}><SkipForward/></button>
+        <button className="calendarTodayButton" onClick={()=>navigateToDate(isoToday())}>{t("common.today")}</button>
+        <button className="iconButton" aria-label={t("calendar.previousMonth")} onClick={()=>navigateToMonth(year,currentMonth-1)}><ChevronLeft/></button>
+        <button className="iconButton" aria-label={t("calendar.nextMonth")} onClick={()=>navigateToMonth(year,currentMonth+1)}><ChevronRight/></button>
+        <button className="calendarSizeButton" onClick={toggleCompact} title={compact?t("calendar.expand"):t("calendar.compact")}>{compact?<Maximize2/>:<Minimize2/>}<span>{compact?t("calendar.large"):t("calendar.compact")}</span></button>
+      </div>
+    </header>
+    <p className="calendarHint">{t("calendar.hint")}</p><div className="calendarViewport"><div className="weekDays">{Array.from({length:7},(_,index)=>new Intl.DateTimeFormat(localeTag,{weekday:"short"}).format(new Date(2026,5,index+1)).slice(0,2)).map(day=><span key={day}>{day}</span>)}</div><div className="calendarGrid">{cells.map((day,index)=>{
     const date=day?`${year}-${String(currentMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`:"";
     const dayEvents=events.filter(event=>event.event_date===date);
     const dayVacations=vacations.filter(vacation=>vacation.start_date<=date&&vacation.end_date>=date);
     const itemCount=dayEvents.length+dayVacations.length;
     const openDay=()=>{if(!day)return;if(typeof window!=="undefined"&&window.innerWidth<1024&&itemCount)setSheetDate(date);else onCreateDate(date)};
-    return <div key={index} className={`${!day?"day muted":"day"}${date===today?" todayGlow":""}`} onClick={openDay} role={day?"button":undefined} tabIndex={day?0:undefined} onKeyDown={event=>{if(day&&(event.key==="Enter"||event.key===" "))openDay()}}>
+    return <div key={index} data-calendar-date={date||undefined} aria-current={date===today?"date":undefined} aria-selected={date===highlightedDate||undefined} className={`${!day?"day muted":"day"}${date===today?" todayGlow":""}${date===highlightedDate?" eventJumpHighlight":""}`} onClick={openDay} role={day?"button":undefined} tabIndex={day?0:undefined} onKeyDown={event=>{if(day&&(event.key==="Enter"||event.key===" "))openDay()}}>
       <b>{day}</b>
-      {dayEvents.map(event=>{const owner=profiles[event.created_by];return <button className="smartCalendarCard eventCalendarCard" key={event.id} onClick={click=>{click.stopPropagation();onEvent(event)}}>
+      {dayEvents.map(event=>{const owner=profiles[event.created_by];return <button aria-pressed={event.id===selectedEventId} className={`smartCalendarCard eventCalendarCard${event.id===selectedEventId?" selectedCalendarEvent":""}`} key={event.id} onClick={click=>{click.stopPropagation();navigateToEvent(event)}}>
         <CalendarAvatar profile={owner}/>
         <span className="calendarCardText"><strong>{event.title}</strong><small>{profileName(owner)}</small></span>
         <span className="calendarCompactIcon">●</span>
@@ -493,7 +578,9 @@ function CalendarPage({month,setMonth,events,vacations,profiles,participantCount
     </div>;
   })}</div></div></section>
   {sheetDate&&<div className="mobileSheetBack calendarDaySheetBack" onMouseDown={event=>{if(event.target===event.currentTarget)setSheetDate("")}}><section className="calendarDaySheet"><span className="sheetHandle"/><header><div><small>AGENDA ZILEI</small><h2>{new Date(`${sheetDate}T12:00:00`).toLocaleDateString("ro-RO",{weekday:"long",day:"numeric",month:"long"})}</h2></div><button className="iconButton" onClick={()=>setSheetDate("")}><X/></button></header><div className="calendarDayItems">{sheetEvents.map(event=><button key={event.id} onClick={()=>{setSheetDate("");onEvent(event)}}><CalendarAvatar profile={profiles[event.created_by]}/><div><strong>{event.title}</strong><span>{event.event_time?.slice(0,5)||"Toată ziua"} · {event.location||"Fără locație"}</span></div><ChevronRight/></button>)}{sheetVacations.map(vacation=><button key={vacation.id} onClick={()=>{setSheetDate("");onVacation(vacation)}}><CalendarAvatar profile={profiles[vacation.user_id]}/><div><strong>✈ {vacation.country}</strong><span>{profileName(profiles[vacation.user_id])}</span></div><ChevronRight/></button>)}</div><button className="primary calendarDayAdd" onClick={()=>{setSheetDate("");onCreateDate(sheetDate)}}><Plus/> Eveniment nou</button></section></div>}
-  </div>;
+  </div>
+  {navigationOpen&&<div className="mobileSheetBack calendarNavigationBack" onMouseDown={event=>{if(event.target===event.currentTarget)setNavigationOpen(false)}}><section className="calendarNavigationSheet" aria-label={t("calendar.navigation")}><span className="sheetHandle"/><header><div><small>{t("calendar.eyebrow")}</small><h2>{t("calendar.navigation")}</h2></div><button className="iconButton" aria-label={t("common.cancel")} onClick={()=>setNavigationOpen(false)}><X/></button></header><div className="calendarNavigationFields"><label>{t("calendar.selectMonth")}<select value={currentMonth} onChange={event=>navigateToMonth(year,Number(event.target.value))}>{monthNames.map((name,index)=><option value={index} key={name}>{name}</option>)}</select></label><label>{t("calendar.selectYear")}<select value={year} onChange={event=>navigateToMonth(Number(event.target.value),currentMonth)}>{years.map(value=><option value={value} key={value}>{value}</option>)}</select></label></div><div className="calendarNavigationActions"><button onClick={()=>{navigateToDate(isoToday());setNavigationOpen(false)}}><CalendarDays/> {t("common.today")}</button><button disabled={!previousEvent} onClick={()=>previousEvent&&navigateToEvent(previousEvent)}><SkipBack/> {t("calendar.previousEvent")}</button><button disabled={!nextEvent} onClick={()=>nextEvent&&navigateToEvent(nextEvent)}><SkipForward/> {t("calendar.nextEvent")}</button></div><div className="calendarFutureEvents"><h3>{t("calendar.futureEvents")}</h3>{futureEvents.length?futureEvents.map(item=><button key={item.id} aria-pressed={item.id===selectedEventId} onClick={()=>navigateToEvent(item)}><time>{new Date(`${item.event_date}T12:00:00`).toLocaleDateString(localeTag,{day:"numeric",month:"short"})}</time><span><strong>{item.title}</strong><small>{t("calendar.oneDayEvent")}</small></span><ChevronRight/></button>):<p>{t("calendar.noFutureEvents")}</p>}</div></section></div>}
+  </>;
 }
 
 function profileName(profile?: Profile) {

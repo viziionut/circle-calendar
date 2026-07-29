@@ -169,6 +169,24 @@
       "3": "Calculez cele mai bune variante..."
     }
   },
+  "calendar": {
+    "eyebrow": "CALENDAR",
+    "selectMonth": "Selectează luna",
+    "selectYear": "Selectează anul",
+    "nextEvent": "Evenimentul următor",
+    "previousEvent": "Evenimentul anterior",
+    "futureEvents": "Evenimente viitoare",
+    "noFutureEvents": "Nu există evenimente viitoare",
+    "goToEvent": "Mergi la eveniment",
+    "navigation": "Navigare calendar",
+    "previousMonth": "Luna anterioară",
+    "nextMonth": "Luna următoare",
+    "compact": "Compact",
+    "large": "Mare",
+    "expand": "Mărește calendarul",
+    "oneDayEvent": "Eveniment de o zi",
+    "hint": "Glisează stânga sau dreapta pentru a schimba luna. Apasă pe o zi pentru detalii."
+  },
   "errors": {
     "accessChecking": "Se verifică accesul…",
     "suspended": "Cont suspendat",
