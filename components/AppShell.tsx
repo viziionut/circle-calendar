@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Bell, CalendarDays, Camera, Check, ChevronLeft, ChevronRight, Clipboard, Upload, Maximize2, Minimize2,
+  Bell, CalendarDays, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Clipboard, Upload, Maximize2, Minimize2,
   Compass, Home, Images, Link2, LogOut, Menu, Plane, Plus, Send, Settings, SkipBack, SkipForward,
   Share2, Sparkles, UserCircle, UserPlus, Users, X
 } from "lucide-react";
@@ -36,6 +36,7 @@ export function AppShell({ session }: { session: Session }) {
   const { setLocale, t } = useI18n();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<string, number>>({});
   const [activeGroupId, setActiveGroupId] = useState("");
   const [events, setEvents] = useState<EventItem[]>([]);
   const [vacations, setVacations] = useState<Vacation[]>([]);
@@ -52,6 +53,7 @@ export function AppShell({ session }: { session: Session }) {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
+  const [groupSwitching, setGroupSwitching] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
 
   const notify = useCallback((message: string) => {
@@ -73,6 +75,22 @@ export function AppShell({ session }: { session: Session }) {
     const rows = (data || []).map((row: any) => row.groups).filter(Boolean) as Group[];
     setGroups(rows);
     setActiveGroupId(current => rows.some(group => group.id === current) ? current : rows[0]?.id || "");
+    if (!rows.length) {
+      setGroupMemberCounts({});
+      return;
+    }
+    const { data: members, error: membersError } = await supabase
+      .from("group_members")
+      .select("group_id")
+      .in("group_id", rows.map(group => group.id));
+    if (membersError) {
+      console.error(membersError);
+      return;
+    }
+    setGroupMemberCounts((members || []).reduce<Record<string, number>>((counts, member) => {
+      counts[member.group_id] = (counts[member.group_id] || 0) + 1;
+      return counts;
+    }, {}));
   }, [session.user.id]);
 
   const loadEvents = useCallback(async () => {
@@ -171,6 +189,7 @@ export function AppShell({ session }: { session: Session }) {
   }
 
   const activeGroup = groups.find(group => group.id === activeGroupId);
+  const activeGroupMemberCount = activeGroup ? groupMemberCounts[activeGroup.id] || 1 : 0;
   const inviteLink = activeGroup ? `${typeof window !== "undefined" ? window.location.origin : ""}/?invite=${activeGroup.invite_code}` : "";
   const upcoming = useMemo(() => events.filter(event => event.event_date >= isoToday()).slice(0, 5), [events]);
 
@@ -180,6 +199,15 @@ export function AppShell({ session }: { session: Session }) {
   }, []);
 
   const openView = (next: View) => { setView(next); setMenuOpen(false); };
+  const changeActiveGroup = (groupId: string) => {
+    if (!groupId || groupId === activeGroupId) return;
+    const nextGroup = groups.find(group => group.id === groupId);
+    setGroupSwitching(true);
+    setActiveGroupId(groupId);
+    setMenuOpen(false);
+    notify(t("groupContext.changed", { name: nextGroup?.name || "" }));
+    window.setTimeout(() => setGroupSwitching(false), 420);
+  };
   const openNotification = (notification: AppNotification) => {
     if (notification.entity_type === "event" && notification.entity_id) {
       const event = events.find(item => item.id === notification.entity_id);
@@ -217,10 +245,10 @@ export function AppShell({ session }: { session: Session }) {
       <small>CIRCLE CALENDAR v6.0</small>
       <h1>Bun venit, {profile?.display_name || "prietene"}</h1>
       <img className="brandEmptyIllustration" src="/brand/empty/groups.svg" alt=""/>
-      <p>Creează un cerc nou sau intră în grupul prietenilor cu un cod de invitație.</p>
+      <p>{t("groupContext.empty")}</p>
       <div className="onboardingActions">
-        <button className="primary" onClick={() => setDialog("create")}><Plus/> Creează grup</button>
-        <button className="secondary" onClick={() => setDialog("join")}><UserPlus/> Intră cu un cod</button>
+        <button className="primary" onClick={() => setDialog("create")}><Plus/> {t("groupContext.create")}</button>
+        <button className="secondary" onClick={() => setDialog("join")}><UserPlus/> {t("groupContext.join")}</button>
       </div>
       <button className="textButton" onClick={() => supabase.auth.signOut()}>Log out</button>
     </section>
@@ -235,7 +263,12 @@ export function AppShell({ session }: { session: Session }) {
     <aside className={menuOpen ? "sidebar open" : "sidebar"}>
       <div className="sidebarFixedTop">
         <div className="sideLogo"><BrandMark/><div><strong>Circle Calendar <em className="versionBadge">v6.3</em></strong><small>PLAN. SHARE. REMEMBER.</small></div><button className="mobileClose" onClick={() => setMenuOpen(false)}><X/></button></div>
-        <label className="groupPicker">GRUP ACTIV<select value={activeGroupId} onChange={event => setActiveGroupId(event.target.value)}>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
+        <label className="groupPicker">
+          <small>{t("groupContext.active")}</small>
+          <span className="groupPickerMain"><i><Users/></i><span><strong>{activeGroup?.name}</strong><em>{t(activeGroupMemberCount === 1 ? "groupContext.member" : "groupContext.members", { count: activeGroupMemberCount })}</em></span><ChevronDown/></span>
+          <span className="groupPickerHint">{t("groupContext.change")}</span>
+          <select aria-label={t("groupContext.change")} value={activeGroupId} onChange={event => changeActiveGroup(event.target.value)}>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select>
+        </label>
       </div>
       <nav className="sidebarScrollArea">
         <button className={view === "home" ? "active" : ""} onClick={() => openView("home")}><Home/>{t("nav.home")}</button>
@@ -251,19 +284,19 @@ export function AppShell({ session }: { session: Session }) {
         <button className="logout" onClick={() => supabase.auth.signOut()}><LogOut/> Log out</button>
       </nav>
       <div className="sidebarFixedBottom">
-        <button className="inviteBox" onClick={() => setDialog("invite")}><small>{t("nav.inviteCode")}</small><strong>{activeGroup?.invite_code}</strong><span><Share2/> {t("nav.invite")}</span></button>
+        <button className="inviteBox" onClick={() => setDialog("invite")}><small>{t("groupContext.inviteFor")}</small><span className="inviteGroupName"><Users/> {activeGroup?.name}</span><strong>{activeGroup?.invite_code}</strong><span><Share2/> {t("nav.invite")}</span></button>
       </div>
     </aside>
 
-    <section className="mainContent">
-      <header className="topbar"><button className="menuToggle" onClick={() => setMenuOpen(true)}><Menu/></button><div><small>{activeGroup?.name}</small><h2>{pageTitle}</h2></div><div className="topActions"><NotificationCenter userId={session.user.id} onNavigate={openNotification}/><button className="primary compact" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Eveniment</button></div></header>
+    <section className={`mainContent${groupSwitching ? " groupSwitching" : ""}`}>
+      <header className="topbar"><button className="menuToggle" onClick={() => setMenuOpen(true)}><Menu/></button><div className="topbarTitle"><small>{t("groupContext.active")}</small><h2>{pageTitle}</h2></div><div className="desktopActiveGroup"><Users/><span>{activeGroup?.name}</span></div><button className="mobileActiveGroup" onClick={() => setMenuOpen(true)} aria-label={t("groupContext.change")}><Users/><span>{activeGroup?.name}</span><ChevronDown/></button><div className="topActions"><NotificationCenter userId={session.user.id} onNavigate={openNotification}/><button className="primary compact" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Eveniment</button></div></header>
 
       {view === "home" && <><div className="page desktopDashboard"><section className="welcome"><div><small>BINE AI REVENIT</small><h1>Salut, {profile?.display_name || profile?.username || "prietene"} 👋</h1><p>Următorul eveniment, albumele recente și grupul tău sunt aici.</p></div><button className="primary" onClick={() => {setSelectedEvent(null);setSelectedDate(isoToday());setModalOpen(true);}}><Plus/> Creează eveniment</button></section><div className="dashboardGrid"><PendingQuickPlans groups={groups} currentUserId={session.user.id}/><section className="panel"><header><div><small>URMEAZĂ</small><h3>Evenimente viitoare</h3></div><button onClick={() => setView("calendar")}>Vezi calendarul</button></header>{upcoming.length ? upcoming.map(event => <button className="eventListRow" key={event.id} onClick={() => {setSelectedEvent(event);setModalOpen(true);}}><span className="dateBox"><b>{new Date(`${event.event_date}T12:00:00`).getDate()}</b><small>{new Date(`${event.event_date}T12:00:00`).toLocaleDateString("ro-RO",{month:"short"})}</small></span><span><strong>{event.title}</strong><small>{event.event_time?.slice(0,5) || "Fără oră"} · {event.location || "Fără locație"}</small></span></button>) : <div className="emptyState brandedEmpty"><img src="/brand/empty/events.svg" alt=""/><span>Nu ai evenimente viitoare.</span></div>}</section><section className="panel memoryPreview"><header><div><small>ALBUME</small><h3>Media recentă</h3></div><button onClick={() => setView("media")}>Vezi toate</button></header><div className="miniMediaGrid">{allMedia.slice(0,6).map(item => item.mime_type.startsWith("video/") ? <video key={item.id} src={item.signed_url}/> : <img key={item.id} src={item.signed_url} alt=""/> )}</div>{!allMedia.length && <div className="emptyState"><Camera/> Pozele vor apărea aici după ce le adaugi într-un eveniment.</div>}</section></div></div><MobileDashboard profile={profile} groups={groups} activeGroupId={activeGroupId} currentUserId={session.user.id} events={events} vacations={vacations} onEvent={event=>{setSelectedEvent(event);setSelectedDate(event.event_date);setModalOpen(true);}} onCalendar={()=>setView("calendar")} onVacations={()=>setView("vacations")} onRefresh={async()=>{await Promise.all([loadGroups(),loadEvents(),loadVacations()])}}/></>}
 
       {view === "calendar" && <CalendarPage groupId={activeGroupId} month={month} setMonth={setMonth} events={events} vacations={vacations} profiles={calendarProfiles} participantCounts={eventParticipantCounts} onEvent={event => {setSelectedEvent(event);setSelectedDate(event.event_date);setModalOpen(true);}} onVacation={() => setView("vacations")} onCreateDate={date => {setSelectedEvent(null);setSelectedDate(date);setModalOpen(true);}}/>}
       {view === "vacations" && <VacationsPage vacations={vacations} groupId={activeGroupId} userId={session.user.id} memberNames={vacationMemberNames} onChanged={loadVacations}/>}
       {view === "media" && <div className="page"><section className="pageTitle"><small>CIRCLE MEMORIES</small><h1>Arhiva evenimentelor</h1><p>Fiecare album este creat automat din media încărcată în evenimente.</p></section><div className="albumCards">{events.filter(event => allMedia.some(media => media.event_id === event.id)).map(event => {const items=allMedia.filter(media => media.event_id===event.id);return <button key={event.id} className="albumCard" onClick={() => {setSelectedEvent(event);setModalOpen(true);}}><div className="albumCover">{items[0]?.mime_type.startsWith("video/") ? <video src={items[0]?.signed_url}/> : <img src={items[0]?.signed_url} alt=""/>}<span>{items.length}</span></div><div><strong>{event.title}</strong><small>{formatDate(event.event_date)} · {items.filter(item=>item.mime_type.startsWith("image/")).length} poze · {items.filter(item=>item.mime_type.startsWith("video/")).length} video</small></div></button>})}</div>{!allMedia.length && <div className="largeEmpty"><Images/><h3>Arhiva este goală</h3><p>Deschide un eveniment și adaugă poze sau videoclipuri.</p></div>}</div>}
-      {view === "groups" && <GroupsPage groups={groups} activeGroupId={activeGroupId} onSelect={setActiveGroupId} onCreate={() => setDialog("create")} onJoin={() => setDialog("join")} onInvite={(groupId) => { setActiveGroupId(groupId); setDialog("invite"); }}/>} 
+      {view === "groups" && <GroupsPage groups={groups} activeGroupId={activeGroupId} onSelect={changeActiveGroup} onCreate={() => setDialog("create")} onJoin={() => setDialog("join")} onInvite={(groupId) => { changeActiveGroup(groupId); setDialog("invite"); }}/>}
       {view === "settings" && profile && <SettingsPage profile={profile} email={session.user.email || ""} onSaved={async () => { await loadProfile(); notify(t("settings.saved")); }}/>}
     </section>
 

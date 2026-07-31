@@ -40,6 +40,17 @@
     "newPlan": "New plan",
     "inviteCode": "INVITE CODE"
   },
+  "groupContext": {
+    "active": "ACTIVE GROUP",
+    "member": "1 member",
+    "members": "{count} members",
+    "change": "Switch group",
+    "changed": "Active group changed to “{name}”",
+    "inviteFor": "Invite code for",
+    "empty": "You are not a member of any group.",
+    "create": "Create group",
+    "join": "Join a group"
+  },
   "auth": {
     "hero": "Events, groups and photo-video albums in one place, on the web and in the mobile app.",
     "createAccount": "Create account",

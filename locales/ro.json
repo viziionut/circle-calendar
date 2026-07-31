@@ -40,6 +40,17 @@
     "newPlan": "Plan nou",
     "inviteCode": "COD INVITAȚIE"
   },
+  "groupContext": {
+    "active": "GRUP ACTIV",
+    "member": "1 membru",
+    "members": "{count} membri",
+    "change": "Schimbă grupul",
+    "changed": "Grup activ schimbat în «{name}»",
+    "inviteFor": "Cod invitație pentru",
+    "empty": "Nu faci parte din niciun grup.",
+    "create": "Creează grup",
+    "join": "Intră într-un grup"
+  },
   "auth": {
     "hero": "Evenimente, grupuri și albume foto-video într-un singur loc, pe web și în aplicația mobilă.",
     "createAccount": "Creează cont",
